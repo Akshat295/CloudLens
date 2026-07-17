@@ -14,17 +14,17 @@ const completeScan = async (
   estimatedSavings = 0
 ) => {
   const scan = await Scan.findByIdAndUpdate(
-    scanId,
-    {
-      status: "COMPLETED",
-      completedAt: new Date(),
-      totalResources,
-      estimatedSavings,
-    },
-    {
-      new: true,
-    }
-  );
+  scanId,
+  {
+    status: "COMPLETED",
+    completedAt: new Date(),
+    totalResources,
+    estimatedSavings,
+  },
+  {
+    returnDocument: "after",
+  }
+);
 
   return scan;
 };

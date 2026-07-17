@@ -16,14 +16,38 @@ const recommendationSchema = new mongoose.Schema(
     severity: {
       type: String,
       enum: ["LOW", "MEDIUM", "HIGH"],
+      required: true,
+    },
+
+    action: {
+      type: String,
+      enum: ["NONE", "STOP", "DOWNSIZE", "UPSIZE"],
+      required: true,
+    },
+
+    confidence: {
+      type: Number,
+      default: 100,
     },
 
     recommendation: {
       type: String,
+      required: true,
     },
 
     reason: {
       type: String,
+      required: true,
+    },
+
+    hourlyPrice: {
+      type: Number,
+      default: 0,
+    },
+
+    monthlyCost: {
+      type: Number,
+      default: 0,
     },
 
     estimatedSavings: {
@@ -33,6 +57,7 @@ const recommendationSchema = new mongoose.Schema(
 
     status: {
       type: String,
+      enum: ["OPEN", "RESOLVED", "IGNORED"],
       default: "OPEN",
     },
   },

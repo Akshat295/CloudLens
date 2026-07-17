@@ -4,8 +4,7 @@ const {
 
 const { ec2Client } = require("../../config/aws");
 
-const { mapEC2Instances } = require("../../utils/mappers/ec2.mapper");
-
+const { mapEC2Instances } = require("../../mappers/ec2.mapper");
 const getEC2Instances = async () => {
   const command = new DescribeInstancesCommand({});
 
