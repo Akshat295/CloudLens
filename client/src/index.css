@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+/* Enables class-based dark mode (toggled via Navbar) instead of relying
+   solely on the OS-level prefers-color-scheme media query. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+body {
+  margin: 0;
+  background: #f5f7fb;
+  font-family: Inter, sans-serif;
+}
+
+/* react-loading-skeleton's colors are read from these variables (see
+   SkeletonTheme in App.jsx). Intentionally NOT overridden under `.dark`:
+   every card that will show a skeleton (SummaryCard, charts, the
+   recommendation table, the resource drawer) keeps a light bg-white/70
+   surface regardless of theme — dark-mode support currently only extends to
+   Navbar/ScanProgressModal/ToastCard/page backgrounds. Reactive dark
+   skeleton colors would render dark-grey bars on those light cards, which
+   is lower contrast, not higher. */
+:root {
+  --skeleton-base-color: #e2e8f0;
+  --skeleton-highlight-color: #f1f5f9;
+}
