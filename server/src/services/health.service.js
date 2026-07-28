@@ -1,8 +1,8 @@
 const healthService = () => {
-    return {
-        message: "Server is running",
-        timestamp: new Date()
-    };
+  return {
+    message: "Server is running",
+    timestamp: new Date(),
+  };
 };
 
 module.exports = healthService;

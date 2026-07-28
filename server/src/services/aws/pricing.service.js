@@ -51,6 +51,37 @@ const getEC2Pricing = async (pricingFilters) => {
   return response;
 };
 
+const getS3Pricing = async (pricingFilters) => {
+  const command = new GetProductsCommand({
+    ServiceCode: "AmazonS3",
+
+    Filters: [
+      {
+        Type: "TERM_MATCH",
+        Field: "productFamily",
+        Value: "Storage",
+      },
+      {
+        Type: "TERM_MATCH",
+        Field: "volumeType",
+        Value: pricingFilters.volumeType,
+      },
+      {
+        Type: "TERM_MATCH",
+        Field: "location",
+        Value: pricingFilters.location,
+      },
+    ],
+
+    MaxResults: 1,
+  });
+
+  const response = await pricingClient.send(command);
+
+  return response;
+};
+
 module.exports = {
   getEC2Pricing,
+  getS3Pricing,
 };

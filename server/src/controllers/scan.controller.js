@@ -1,23 +1,12 @@
 const { scanInfrastructure } = require("../services/scanner/scanner.service");
+const asyncHandler = require("../utils/asyncHandler");
+const { sendSuccess } = require("../utils/apiResponse");
 
-const scan = async (req, res) => {
-  try {
-    const result = await scanInfrastructure();
+const scan = asyncHandler(async (req, res) => {
+  const result = await scanInfrastructure();
 
-    res.status(200).json({
-      success: true,
-      data: result,
-    });
-
-  } catch (error) {
-
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-
-  }
-};
+  sendSuccess(res, result);
+});
 
 module.exports = {
   scan,

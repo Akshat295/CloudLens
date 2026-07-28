@@ -1,5 +1,6 @@
 const {
   DescribeInstancesCommand,
+  StopInstancesCommand,
 } = require("@aws-sdk/client-ec2");
 
 const { ec2Client } = require("../../config/aws");
@@ -13,6 +14,15 @@ const getEC2Instances = async () => {
   return mapEC2Instances(response);
 };
 
+const stopEC2Instance = async (instanceId) => {
+  const command = new StopInstancesCommand({
+    InstanceIds: [instanceId],
+  });
+
+  return await ec2Client.send(command);
+};
+
 module.exports = {
   getEC2Instances,
+  stopEC2Instance,
 };

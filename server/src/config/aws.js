@@ -1,4 +1,11 @@
-const { EC2Client } = require("@aws-sdk/client-ec2");
+const {
+  EC2Client,
+} = require("@aws-sdk/client-ec2");
+
+const {
+  S3Client,
+} = require("@aws-sdk/client-s3");
+
 const {
   CloudWatchClient,
 } = require("@aws-sdk/client-cloudwatch");
@@ -11,18 +18,18 @@ const config = {
 };
 
 const ec2Client = new EC2Client(config);
+const s3Client = new S3Client(config);
+const cloudWatchClient = new CloudWatchClient(config);
 
-const cloudWatchClient =
-  new CloudWatchClient(config);
-
-// Pricing API sirf us-east-1 endpoint se serve hoti hai.
-const pricingClient =
-  new PricingClient({
-    region: "us-east-1",
-  });
+// The AWS Pricing API is only served from the us-east-1 endpoint,
+// regardless of which region the scanned resources live in.
+const pricingClient = new PricingClient({
+  region: "us-east-1",
+});
 
 module.exports = {
   ec2Client,
+  s3Client,
   cloudWatchClient,
   pricingClient,
 };

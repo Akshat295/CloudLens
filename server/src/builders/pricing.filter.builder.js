@@ -1,5 +1,6 @@
 const {
   getLocationFromAvailabilityZone,
+  getLocationFromRegion,
 } = require("../utils/region.util");
 
 const buildEC2PricingFilters = (instance) => {
@@ -20,6 +21,15 @@ const buildEC2PricingFilters = (instance) => {
   };
 };
 
+const buildS3PricingFilters = (region) => {
+  return {
+    location: getLocationFromRegion(region),
+
+    volumeType: "Standard",
+  };
+};
+
 module.exports = {
   buildEC2PricingFilters,
+  buildS3PricingFilters,
 };

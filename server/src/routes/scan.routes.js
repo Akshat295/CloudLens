@@ -4,6 +4,6 @@ const router = express.Router();
 
 const { scan } = require("../controllers/scan.controller");
 
-router.get("/", scan);
+router.post("/", scan);
 
 module.exports = router;

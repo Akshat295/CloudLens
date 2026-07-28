@@ -21,7 +21,7 @@ const recommendationSchema = new mongoose.Schema(
 
     action: {
       type: String,
-      enum: ["NONE", "STOP", "DOWNSIZE", "UPSIZE"],
+      enum: ["NONE", "STOP", "DOWNSIZE", "UPSIZE", "REVIEW"],
       required: true,
     },
 

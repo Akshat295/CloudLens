@@ -1,14 +1,13 @@
 const healthService = require("../services/health.service");
+const asyncHandler = require("../utils/asyncHandler");
+const { sendSuccess } = require("../utils/apiResponse");
 
-const checkHealth = (req, res) => {
-    const data = healthService();
+const checkHealth = asyncHandler(async (req, res) => {
+  const data = healthService();
 
-    res.status(200).json({
-        success: true,
-        data
-    });
-};
+  sendSuccess(res, data);
+});
 
 module.exports = {
-    checkHealth
+  checkHealth,
 };
