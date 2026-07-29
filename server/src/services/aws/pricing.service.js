@@ -81,7 +81,43 @@ const getS3Pricing = async (pricingFilters) => {
   return response;
 };
 
+const getRDSPricing = async (pricingFilters) => {
+  const command = new GetProductsCommand({
+    ServiceCode: "AmazonRDS",
+
+    Filters: [
+      {
+        Type: "TERM_MATCH",
+        Field: "instanceType",
+        Value: pricingFilters.instanceType,
+      },
+      {
+        Type: "TERM_MATCH",
+        Field: "location",
+        Value: pricingFilters.location,
+      },
+      {
+        Type: "TERM_MATCH",
+        Field: "databaseEngine",
+        Value: pricingFilters.databaseEngine,
+      },
+      {
+        Type: "TERM_MATCH",
+        Field: "deploymentOption",
+        Value: pricingFilters.deploymentOption,
+      },
+    ],
+
+    MaxResults: 1,
+  });
+
+  const response = await pricingClient.send(command);
+
+  return response;
+};
+
 module.exports = {
   getEC2Pricing,
   getS3Pricing,
+  getRDSPricing,
 };

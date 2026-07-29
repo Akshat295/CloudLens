@@ -13,15 +13,44 @@ const recommendationSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Defaults to COST since that's what every pre-existing EC2/S3/RDS
+    // recommendation actually is — those callers don't pass `category` at
+    // all, so this default is what keeps their saveRecommendation() calls
+    // working unchanged while still getting a correct category. IAM's
+    // scanner is the only caller that passes `category: "SECURITY"`
+    // explicitly.
+    category: {
+      type: String,
+      enum: ["COST", "SECURITY", "PERFORMANCE", "RELIABILITY", "OPERATIONAL_EXCELLENCE"],
+      default: "COST",
+    },
+
     severity: {
       type: String,
       enum: ["LOW", "MEDIUM", "HIGH"],
       required: true,
     },
 
+    // NONE/STOP/DOWNSIZE/UPSIZE/REVIEW are the original EC2/S3/RDS action
+    // set, left untouched. The remaining values are IAM-specific, added so
+    // IAM recommendations carry a real remediation action instead of a
+    // generic REVIEW/STOP.
     action: {
       type: String,
-      enum: ["NONE", "STOP", "DOWNSIZE", "UPSIZE", "REVIEW"],
+      enum: [
+        "NONE",
+        "STOP",
+        "DOWNSIZE",
+        "UPSIZE",
+        "REVIEW",
+        "ENABLE_MFA",
+        "DELETE_UNUSED_KEY",
+        "REVIEW_PERMISSIONS",
+        "ROTATE_ACCESS_KEY",
+        "REMOVE_ADMIN_ACCESS",
+        "DELETE_UNUSED_ROLE",
+        "TAG_RESOURCE",
+      ],
       required: true,
     },
 

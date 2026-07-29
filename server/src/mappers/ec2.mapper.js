@@ -20,6 +20,11 @@ const mapEC2Instances = (response) => {
         privateIp: instance.PrivateIpAddress,
 
         launchTime: instance.LaunchTime,
+
+        securityGroups: (instance.SecurityGroups || []).map((group) => ({
+          groupId: group.GroupId,
+          groupName: group.GroupName,
+        })),
       });
     }
   }

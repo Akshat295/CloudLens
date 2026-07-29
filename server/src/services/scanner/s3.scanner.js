@@ -14,6 +14,7 @@ const { getS3Pricing } = require("../aws/pricing.service");
 
 const { saveResources } = require("../database/resource.repository");
 const { saveRecommendation } = require("../database/recommendation.repository");
+const { saveInsights } = require("../database/insight.repository");
 
 const {
   analyzeBucketConfiguration,
@@ -39,6 +40,8 @@ const {
   calculateS3MonthlyCost,
   calculateS3EstimatedSavings,
 } = require("../../calculator/storage.calculator");
+
+const { generateS3Insights } = require("../insight/s3.insight");
 
 const logBucketScanResult = (
   bucket,
@@ -214,6 +217,21 @@ const processBucket = async (scanId, bucket) => {
 
   return {
     estimatedSavings,
+    // Compact per-bucket signals for generateS3Insights — deliberately just
+    // the handful of primitives its rules actually check, rather than the
+    // full metadata/analysis objects above.
+    insightInput: {
+      bucketName: bucket.bucketName,
+      isPublic,
+      publicPolicyGrant: policyAnalysis.publicRead || policyAnalysis.publicWrite || policyAnalysis.fullAccess,
+      encryptionEnabled,
+      versioningEnabled,
+      hasLifecycleRules: lifecycleConfigured,
+      bucketSizeGB,
+      standardPercent: distribution.percentages.STANDARD,
+      monthlyCost,
+      estimatedSavings,
+    },
     resource: {
       resourceId: bucket.bucketName,
       name: bucket.bucketName,
@@ -259,16 +277,24 @@ const scanS3 = async (scanId) => {
   const buckets = await getBuckets();
 
   const bucketResources = [];
+  const insightInputs = [];
   let totalSavings = 0;
 
   for (const bucket of buckets) {
-    const { resource, estimatedSavings } = await processBucket(scanId, bucket);
+    const { resource, estimatedSavings, insightInput } = await processBucket(scanId, bucket);
 
     bucketResources.push(resource);
+    insightInputs.push(insightInput);
     totalSavings += estimatedSavings;
   }
 
   await saveResources(scanId, "S3", bucketResources);
+
+  // Fleet-wide, rule-based (no LLM) insights computed once all buckets are
+  // in, then persisted so the dashboard can read them back without
+  // recomputing anything.
+  const insights = generateS3Insights(insightInputs);
+  await saveInsights(scanId, insights);
 
   return {
     totalResources: buckets.length,

@@ -12,6 +12,12 @@ const {
 const {
   PricingClient,
 } = require("@aws-sdk/client-pricing");
+const {
+  RDSClient,
+} = require("@aws-sdk/client-rds");
+const {
+  IAMClient,
+} = require("@aws-sdk/client-iam");
 
 const config = {
   region: process.env.AWS_REGION,
@@ -20,6 +26,11 @@ const config = {
 const ec2Client = new EC2Client(config);
 const s3Client = new S3Client(config);
 const cloudWatchClient = new CloudWatchClient(config);
+const rdsClient = new RDSClient(config);
+
+// IAM is a global service (no per-region endpoints) but the client still
+// takes the same config shape as every other client here.
+const iamClient = new IAMClient(config);
 
 // The AWS Pricing API is only served from the us-east-1 endpoint,
 // regardless of which region the scanned resources live in.
@@ -32,4 +43,6 @@ module.exports = {
   s3Client,
   cloudWatchClient,
   pricingClient,
+  rdsClient,
+  iamClient,
 };
