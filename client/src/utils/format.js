@@ -1,5 +1,45 @@
 export const formatCurrency = (value) => `$${Number(value || 0).toFixed(2)}`;
 
+// Human-readable labels for Recommendation.action — covers both the
+// original EC2/S3/RDS action set and the newer IAM-specific ones. Falls
+// back to a generic snake_case -> Title Case conversion for anything not
+// explicitly listed, so a future action value still renders reasonably.
+const ACTION_LABELS = {
+  NONE: "No Action Needed",
+  STOP: "Stop Instance",
+  DOWNSIZE: "Downsize",
+  UPSIZE: "Upsize",
+  REVIEW: "Review",
+  ENABLE_MFA: "Enable MFA",
+  DELETE_UNUSED_KEY: "Delete Unused Key",
+  REVIEW_PERMISSIONS: "Review Permissions",
+  ROTATE_ACCESS_KEY: "Rotate Access Key",
+  REMOVE_ADMIN_ACCESS: "Remove Admin Access",
+  DELETE_UNUSED_ROLE: "Delete Unused Resource",
+  TAG_RESOURCE: "Add Tags",
+};
+
+export const formatActionLabel = (action) =>
+  ACTION_LABELS[action] ||
+  (action || "")
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
+export const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`;
+
+const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"];
+
+export const formatBytes = (value) => {
+  const bytes = Number(value || 0);
+  if (bytes <= 0) return "0 B";
+
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), BYTE_UNITS.length - 1);
+  const scaled = bytes / 1024 ** exponent;
+  return `${scaled.toFixed(scaled >= 10 || exponent === 0 ? 0 : 1)} ${BYTE_UNITS[exponent]}`;
+};
+
 export const formatDateTime = (value) => {
   if (!value) return "N/A";
 

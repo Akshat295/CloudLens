@@ -7,12 +7,24 @@ import {
   FaTriangleExclamation,
   FaCircleExclamation,
   FaCircleCheck,
+  FaMicrochip,
+  FaNetworkWired,
+  FaHardDrive,
+  FaMoon,
+  FaClockRotateLeft,
+  FaShieldHalved,
+  FaUser,
+  FaUserGroup,
+  FaKey,
+  FaUserGear,
+  FaGaugeHigh,
 } from "react-icons/fa6";
 
 import Navbar from "../components/Navbar";
 import PageTransition from "../components/PageTransition";
 import HeroSection from "../components/HeroSection";
 import SummaryCard from "../components/SummaryCard";
+import AIInsightsCard from "../components/AIInsightsCard";
 import ErrorBanner from "../components/ErrorBanner";
 import ResourceHealthPieChart from "../components/ResourceHealthPieChart";
 import CostBreakdownDonutChart from "../components/CostBreakdownDonutChart";
@@ -25,7 +37,7 @@ import { getRecommendations } from "../services/recommendation.service";
 import { getScans } from "../services/scan.service";
 import { useAsyncData } from "../hooks/useAsyncData";
 import { useScanTrigger } from "../hooks/useScanTrigger";
-import { formatCurrency } from "../utils/format";
+import { formatCurrency, formatPercent, formatBytes } from "../utils/format";
 
 const fetchDashboardBundle = async () => {
   const [dashboard, recommendations, scans] = await Promise.all([
@@ -96,6 +108,10 @@ const Dashboard = () => {
           lastScan={lastScan}
           loading={isLoading}
         />
+      </div>
+
+      <div className="mt-6">
+        <AIInsightsCard insights={dashboardData.insights} loading={isLoading} />
       </div>
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -170,6 +186,156 @@ const Dashboard = () => {
           value={dashboardData.lowRecommendations}
           icon={<FaCircleCheck size={22} />}
           gradient="from-green-500 to-emerald-500"
+          loading={isLoading}
+        />
+      </div>
+
+      <h2 className="mt-10 mb-4 text-xl font-semibold text-slate-900 dark:text-white">Recommendation Categories</h2>
+
+      <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3">
+        <SummaryCard
+          index={0}
+          title="Security Findings"
+          value={dashboardData.categoryStats?.securityFindings}
+          icon={<FaShieldHalved size={22} />}
+          gradient="from-red-500 to-rose-600"
+          loading={isLoading}
+        />
+
+        <SummaryCard
+          index={1}
+          title="Cost Findings"
+          value={dashboardData.categoryStats?.costFindings}
+          icon={<FaDollarSign size={22} />}
+          gradient="from-amber-500 to-orange-500"
+          loading={isLoading}
+        />
+
+        <SummaryCard
+          index={2}
+          title="Performance Findings"
+          value={dashboardData.categoryStats?.performanceFindings}
+          icon={<FaGaugeHigh size={22} />}
+          gradient="from-indigo-500 to-purple-500"
+          loading={isLoading}
+        />
+      </div>
+
+      <h2 className="mt-10 mb-4 text-xl font-semibold text-slate-900 dark:text-white">EC2 Fleet Insights</h2>
+
+      <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <SummaryCard
+          index={0}
+          title="Average CPU"
+          value={dashboardData.ec2Stats?.avgCpu}
+          format={formatPercent}
+          icon={<FaMicrochip size={20} />}
+          gradient="from-blue-500 to-cyan-500"
+          loading={isLoading}
+        />
+
+        <SummaryCard
+          index={1}
+          title="Average Network"
+          value={dashboardData.ec2Stats?.avgNetwork}
+          format={formatBytes}
+          icon={<FaNetworkWired size={20} />}
+          gradient="from-indigo-500 to-purple-500"
+          loading={isLoading}
+        />
+
+        <SummaryCard
+          index={2}
+          title="Average Disk"
+          value={dashboardData.ec2Stats?.avgDisk}
+          format={formatBytes}
+          icon={<FaHardDrive size={20} />}
+          gradient="from-fuchsia-500 to-pink-500"
+          loading={isLoading}
+        />
+
+        <SummaryCard
+          index={3}
+          title="Idle Instances"
+          value={dashboardData.ec2Stats?.idleInstances}
+          icon={<FaMoon size={20} />}
+          gradient="from-slate-500 to-slate-700"
+          loading={isLoading}
+        />
+
+        <SummaryCard
+          index={4}
+          title="Old Instances"
+          value={dashboardData.ec2Stats?.oldInstances}
+          icon={<FaClockRotateLeft size={20} />}
+          gradient="from-amber-500 to-orange-600"
+          loading={isLoading}
+        />
+
+        <SummaryCard
+          index={5}
+          title="Encrypted Volumes"
+          value={dashboardData.ec2Stats?.encryptedVolumes}
+          icon={<FaShieldHalved size={20} />}
+          gradient="from-emerald-500 to-teal-500"
+          loading={isLoading}
+        />
+      </div>
+
+      <h2 className="mt-10 mb-4 text-xl font-semibold text-slate-900 dark:text-white">IAM Security Insights</h2>
+
+      <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <SummaryCard
+          index={0}
+          title="IAM Users"
+          value={dashboardData.iamStats?.totalUsers}
+          icon={<FaUser size={20} />}
+          gradient="from-blue-500 to-indigo-500"
+          loading={isLoading}
+        />
+
+        <SummaryCard
+          index={1}
+          title="IAM Roles"
+          value={dashboardData.iamStats?.totalRoles}
+          icon={<FaUserGroup size={20} />}
+          gradient="from-indigo-500 to-purple-500"
+          loading={isLoading}
+        />
+
+        <SummaryCard
+          index={2}
+          title="MFA Enabled"
+          value={dashboardData.iamStats?.mfaEnabledUsers}
+          icon={<FaKey size={20} />}
+          gradient="from-emerald-500 to-teal-500"
+          loading={isLoading}
+        />
+
+        <SummaryCard
+          index={3}
+          title="Admin Users"
+          value={dashboardData.iamStats?.adminUsers}
+          icon={<FaUserGear size={20} />}
+          gradient="from-amber-500 to-orange-600"
+          loading={isLoading}
+        />
+
+        <SummaryCard
+          index={4}
+          title="Old Access Keys"
+          value={dashboardData.iamStats?.oldAccessKeys}
+          icon={<FaClockRotateLeft size={20} />}
+          gradient="from-fuchsia-500 to-pink-500"
+          loading={isLoading}
+        />
+
+        <SummaryCard
+          index={5}
+          title="High Risk Users"
+          value={dashboardData.iamStats?.highRiskUsers}
+          icon={<FaTriangleExclamation size={20} />}
+          gradient="from-red-500 to-rose-600"
           loading={isLoading}
         />
       </div>

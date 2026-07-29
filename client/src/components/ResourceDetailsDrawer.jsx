@@ -1,16 +1,33 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { FaXmark, FaCircleStop, FaBan, FaCircleCheck } from "react-icons/fa6";
+import {
+  FaXmark,
+  FaCircleStop,
+  FaBan,
+  FaCircleCheck,
+  FaArrowUpRightFromSquare,
+  FaChartLine,
+  FaLock,
+} from "react-icons/fa6";
 import ActionButton from "./ActionButton";
 import Badge from "./Badge";
+import CopyButton from "./CopyButton";
+import LinkButton from "./LinkButton";
 import ResourceDetailsDrawerSkeleton from "./ResourceDetailsDrawerSkeleton";
-import { formatDateTime, formatCurrency } from "../utils/format";
+import { formatDateTime, formatCurrency, formatPercent, formatBytes, formatActionLabel } from "../utils/format";
 import {
   getResourceStateBadgeClass,
   getSeverityBadgeStyle,
   getRecommendationStatusBadgeStyle,
+  getCategoryBadgeStyle,
 } from "../utils/badge";
+import {
+  getS3ConsoleUrl,
+  getS3MetricsUrl,
+  getS3PermissionsUrl,
+  getS3BucketArn,
+} from "../utils/awsConsole";
 
 const formatState = (state) => {
   if (!state) return "N/A";
@@ -163,7 +180,334 @@ const ResourceDetailsDrawer = ({
                       {resource.severity} severity
                     </Badge>
                   )}
+
+                  <Badge {...getCategoryBadgeStyle(resource.category)}>{resource.category || "COST"}</Badge>
+
+                  {resource.action && resource.action !== "NONE" && (
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                      {formatActionLabel(resource.action)}
+                    </span>
+                  )}
                 </motion.div>
+
+                {resource.resourceType === "EC2" && (
+                  <motion.div
+                    variants={bodyItemVariants}
+                    className="mb-6 rounded-xl border border-slate-100 bg-slate-50/60 p-4"
+                  >
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                      Optimization Insights
+                    </h3>
+
+                    <dl className="divide-y divide-slate-100">
+                      <DetailRow
+                        label="Average CPU"
+                        value={formatPercent(resource.metadata?.averageCpu)}
+                      />
+                      <DetailRow
+                        label="Network In / Out"
+                        value={`${formatBytes(resource.metadata?.networkIn)} / ${formatBytes(resource.metadata?.networkOut)}`}
+                      />
+                      <DetailRow
+                        label="Disk Read / Write"
+                        value={`${formatBytes(resource.metadata?.diskReadBytes)} / ${formatBytes(resource.metadata?.diskWriteBytes)}`}
+                      />
+                      <DetailRow
+                        label="Disk Ops (Read / Write)"
+                        value={`${Math.round(resource.metadata?.diskReadOps || 0)} / ${Math.round(resource.metadata?.diskWriteOps || 0)} ops/hr`}
+                      />
+                      <DetailRow
+                        label="Launch Date"
+                        value={formatDateTime(resource.metadata?.launchTime)}
+                      />
+                      <DetailRow
+                        label="Instance Age"
+                        value={`${resource.metadata?.instanceAgeDays ?? 0} days`}
+                      />
+                      <DetailRow label="Elastic IP" value={resource.metadata?.elasticIp || "NONE"} />
+
+                      <DetailRow label="Security Groups">
+                        <div className="flex flex-wrap justify-end gap-1">
+                          {resource.metadata?.securityGroups?.length ? (
+                            resource.metadata.securityGroups.map((group) => (
+                              <span
+                                key={group.groupId}
+                                className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+                              >
+                                {group.groupName || group.groupId}
+                              </span>
+                            ))
+                          ) : (
+                            <span>N/A</span>
+                          )}
+                        </div>
+                      </DetailRow>
+
+                      <DetailRow label="EBS Volumes">
+                        <div className="flex flex-col items-end gap-1">
+                          {resource.metadata?.volumeIds?.length ? (
+                            resource.metadata.volumeIds.map((volumeId, index) => (
+                              <span key={volumeId} className="text-xs text-slate-600">
+                                {volumeId} · {resource.metadata.volumeTypes?.[index] || "—"} ·{" "}
+                                {resource.metadata.encrypted?.[index] ? "Encrypted" : "Unencrypted"}
+                              </span>
+                            ))
+                          ) : (
+                            <span>N/A</span>
+                          )}
+                        </div>
+                      </DetailRow>
+                    </dl>
+
+                    <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+                      <StatTile
+                        label="Current Cost"
+                        value={formatCurrency(resource.metadata?.costComparison?.currentMonthlyCost)}
+                        accentClass="text-amber-600"
+                      />
+                      <StatTile
+                        label="Optimized Cost"
+                        value={formatCurrency(resource.metadata?.costComparison?.optimizedMonthlyCost)}
+                        accentClass="text-blue-600"
+                      />
+                      <StatTile
+                        label="Monthly Savings"
+                        value={formatCurrency(resource.metadata?.costComparison?.monthlySavings)}
+                        accentClass="text-emerald-600"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
+                {resource.resourceType === "RDS" && (
+                  <motion.div
+                    variants={bodyItemVariants}
+                    className="mb-6 rounded-xl border border-slate-100 bg-slate-50/60 p-4"
+                  >
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                      Database Details
+                    </h3>
+
+                    <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3">
+                      <StatTile
+                        label="Monthly Cost"
+                        value={formatCurrency(resource.metadata?.monthlyCost)}
+                        accentClass="text-amber-600"
+                      />
+                      <StatTile
+                        label="Average CPU"
+                        value={formatPercent(resource.metadata?.averageCpu)}
+                        accentClass="text-blue-600"
+                      />
+                    </div>
+
+                    <dl className="divide-y divide-slate-100">
+                      <DetailRow
+                        label="Engine"
+                        value={`${resource.metadata?.engine || "N/A"} ${resource.metadata?.engineVersion || ""}`.trim()}
+                      />
+                      <DetailRow label="Instance Class" value={resource.metadata?.instanceClass} />
+                      <DetailRow label="Status" value={resource.metadata?.status} />
+                      <DetailRow label="Storage Type" value={resource.metadata?.storageType} />
+                      <DetailRow
+                        label="Allocated Storage"
+                        value={`${resource.metadata?.allocatedStorage ?? 0} GB`}
+                      />
+                      <DetailRow label="Multi-AZ" value={resource.metadata?.multiAZ ? "Yes" : "No"} />
+                      <DetailRow
+                        label="Publicly Accessible"
+                        value={resource.metadata?.publiclyAccessible ? "Yes" : "No"}
+                      />
+                      <DetailRow
+                        label="Backup Retention"
+                        value={`${resource.metadata?.backupRetentionPeriod ?? 0} day(s)`}
+                      />
+                      <DetailRow
+                        label="Storage Encrypted"
+                        value={resource.metadata?.storageEncrypted ? "Yes" : "No"}
+                      />
+                      <DetailRow label="Availability Zone" value={resource.metadata?.availabilityZone} />
+                      <DetailRow
+                        label="Endpoint"
+                        value={
+                          resource.metadata?.endpoint?.address
+                            ? `${resource.metadata.endpoint.address}:${resource.metadata.endpoint.port}`
+                            : "N/A"
+                        }
+                      />
+                    </dl>
+                  </motion.div>
+                )}
+
+                {(resource.resourceType === "IAM_USER" ||
+                  resource.resourceType === "IAM_ROLE" ||
+                  resource.resourceType === "IAM_ROOT_ACCOUNT") && (
+                  <motion.div
+                    variants={bodyItemVariants}
+                    className="mb-6 rounded-xl border border-slate-100 bg-slate-50/60 p-4"
+                  >
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                      {resource.resourceType === "IAM_ROLE"
+                        ? "Role Security"
+                        : resource.resourceType === "IAM_ROOT_ACCOUNT"
+                          ? "Root Account Security"
+                          : "User Security"}
+                    </h3>
+
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          resource.metadata?.mfaEnabled
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-red-50 text-red-700"
+                        }`}
+                      >
+                        MFA {resource.metadata?.mfaEnabled ? "Enabled" : "Disabled"}
+                      </span>
+
+                      {resource.metadata?.hasAdminAccess && (
+                        <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                          Administrator Access
+                        </span>
+                      )}
+                    </div>
+
+                    {resource.resourceType !== "IAM_ROOT_ACCOUNT" && (
+                      <dl className="divide-y divide-slate-100">
+                        {resource.resourceType === "IAM_USER" && (
+                          <>
+                            <DetailRow
+                              label="Last Login"
+                              value={formatDateTime(resource.metadata?.passwordLastUsed)}
+                            />
+
+                            <DetailRow label="Groups">
+                              <div className="flex flex-wrap justify-end gap-1">
+                                {resource.metadata?.groups?.length ? (
+                                  resource.metadata.groups.map((group) => (
+                                    <span
+                                      key={group}
+                                      className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+                                    >
+                                      {group}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span>N/A</span>
+                                )}
+                              </div>
+                            </DetailRow>
+
+                            <DetailRow label="Access Keys">
+                              <div className="flex flex-col items-end gap-1">
+                                {resource.metadata?.accessKeys?.length ? (
+                                  resource.metadata.accessKeys.map((key) => (
+                                    <span key={key.accessKeyId} className="text-xs text-slate-600">
+                                      {key.accessKeyId} · {key.status} · {key.ageDays ?? 0}d old
+                                      {key.isOld ? " (rotate)" : ""}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span>N/A</span>
+                                )}
+                              </div>
+                            </DetailRow>
+                          </>
+                        )}
+
+                        {resource.resourceType === "IAM_ROLE" && (
+                          <>
+                            <DetailRow
+                              label="Last Used"
+                              value={formatDateTime(resource.metadata?.lastUsedDate)}
+                            />
+
+                            <DetailRow label="Trust Policy (Trusted Services)">
+                              <div className="flex flex-wrap justify-end gap-1">
+                                {resource.metadata?.trustedServices?.length ? (
+                                  resource.metadata.trustedServices.map((service) => (
+                                    <span
+                                      key={service}
+                                      className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+                                    >
+                                      {service}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span>N/A</span>
+                                )}
+                              </div>
+                            </DetailRow>
+                          </>
+                        )}
+
+                        <DetailRow label="Attached Policies">
+                          <div className="flex flex-wrap justify-end gap-1">
+                            {resource.metadata?.attachedPolicies?.length ? (
+                              resource.metadata.attachedPolicies.map((policy) => (
+                                <span
+                                  key={policy.policyArn || policy.policyName}
+                                  className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+                                >
+                                  {policy.policyName}
+                                </span>
+                              ))
+                            ) : (
+                              <span>N/A</span>
+                            )}
+                          </div>
+                        </DetailRow>
+
+                        <DetailRow label="Inline Policies">
+                          <div className="flex flex-wrap justify-end gap-1">
+                            {resource.metadata?.inlinePolicies?.length ? (
+                              resource.metadata.inlinePolicies.map((policyName) => (
+                                <span
+                                  key={policyName}
+                                  className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+                                >
+                                  {policyName}
+                                </span>
+                              ))
+                            ) : (
+                              <span>N/A</span>
+                            )}
+                          </div>
+                        </DetailRow>
+                      </dl>
+                    )}
+                  </motion.div>
+                )}
+
+                {resource.resourceType === "S3" && (
+                  <motion.div
+                    variants={bodyItemVariants}
+                    className="mb-6 rounded-xl border border-slate-100 bg-slate-50/60 p-4"
+                  >
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                      AWS Console Actions
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      <LinkButton
+                        href={getS3ConsoleUrl(resource.resourceId, resource.metadata?.region)}
+                        icon={FaArrowUpRightFromSquare}
+                        label="Open in AWS Console"
+                      />
+                      <LinkButton
+                        href={getS3MetricsUrl(resource.resourceId, resource.metadata?.region)}
+                        icon={FaChartLine}
+                        label="Open Metrics"
+                      />
+                      <LinkButton
+                        href={getS3PermissionsUrl(resource.resourceId, resource.metadata?.region)}
+                        icon={FaLock}
+                        label="Open Permissions"
+                      />
+                      <CopyButton value={getS3BucketArn(resource.resourceId)} label="Copy ARN" />
+                      <CopyButton value={resource.resourceId} label="Copy Bucket Name" />
+                    </div>
+                  </motion.div>
+                )}
 
                 <motion.div variants={bodyItemVariants} className="mb-6 grid grid-cols-3 gap-2 sm:gap-3">
                   <StatTile
@@ -184,7 +528,9 @@ const ResourceDetailsDrawer = ({
                 </motion.div>
 
                 <motion.div variants={bodyItemVariants} className="mb-6 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                  <h3 className="text-sm font-semibold text-slate-700">CPU Recommendation</h3>
+                  <h3 className="text-sm font-semibold text-slate-700">
+                    {resource.resourceType === "EC2" ? "CPU Recommendation" : "Recommendation"}
+                  </h3>
                   <p className="mt-1 text-sm leading-relaxed text-slate-600">
                     {resource.recommendation || "N/A"}
                   </p>

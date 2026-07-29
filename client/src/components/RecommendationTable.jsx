@@ -16,11 +16,12 @@ import NoResultsState from "./NoResultsState";
 import SortableTh from "./SortableTh";
 import TablePagination from "./TablePagination";
 import { useRecommendationActions } from "../hooks/useRecommendationActions";
-import { formatCurrency } from "../utils/format";
+import { formatCurrency, formatActionLabel } from "../utils/format";
 import { compareValues } from "../utils/sort";
 import {
   getSeverityBadgeStyle,
   getRecommendationStatusBadgeStyle,
+  getCategoryBadgeStyle,
 } from "../utils/badge";
 
 const PAGE_SIZE = 8;
@@ -44,6 +45,7 @@ const STATUS_OPTIONS = [
 const COLUMNS = [
   { key: "resource", label: "Resource", sortKey: "resourceName" },
   { key: "instanceType", label: "Instance Type", sortKey: "instanceType" },
+  { key: "category", label: "Category", sortKey: "category" },
   { key: "severity", label: "Severity", sortKey: "severity" },
   { key: "actions", label: "Actions", sortKey: null },
   { key: "savings", label: "Savings", sortKey: "estimatedSavings" },
@@ -71,6 +73,8 @@ const getSortValue = (item, key) => {
       return (item.resourceName || item.resourceId || "").toLowerCase();
     case "instanceType":
       return (item.instanceType || "").toLowerCase();
+    case "category":
+      return (item.category || "").toLowerCase();
     case "severity":
       return SEVERITY_RANK[item.severity] || 0;
     case "estimatedSavings":
@@ -285,7 +289,14 @@ const RecommendationTable = ({
                           </td>
 
                           <td className="px-4 py-3.5">
+                            <Badge {...getCategoryBadgeStyle(item.category)}>{item.category || "COST"}</Badge>
+                          </td>
+
+                          <td className="px-4 py-3.5">
                             <Badge {...getSeverityBadgeStyle(item.severity)}>{item.severity}</Badge>
+                            {item.action !== "NONE" && (
+                              <div className="mt-1 text-xs text-slate-500">{formatActionLabel(item.action)}</div>
+                            )}
                           </td>
 
                           <td className="px-4 py-3.5" onClick={(event) => event.stopPropagation()}>

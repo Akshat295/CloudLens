@@ -76,6 +76,22 @@ export const getRecommendationStatusBadgeStyle = (status) => {
   }
 };
 
+export const getCategoryBadgeStyle = (category) => {
+  switch (category) {
+    case "SECURITY":
+      return { badgeClass: "bg-red-50 text-red-700 border-red-200", dotClass: "bg-red-500" };
+    case "PERFORMANCE":
+      return { badgeClass: "bg-indigo-50 text-indigo-700 border-indigo-200", dotClass: "bg-indigo-500" };
+    case "RELIABILITY":
+      return { badgeClass: "bg-teal-50 text-teal-700 border-teal-200", dotClass: "bg-teal-500" };
+    case "OPERATIONAL_EXCELLENCE":
+      return { badgeClass: "bg-purple-50 text-purple-700 border-purple-200", dotClass: "bg-purple-500" };
+    case "COST":
+    default:
+      return { badgeClass: "bg-amber-50 text-amber-700 border-amber-200", dotClass: "bg-amber-500" };
+  }
+};
+
 export const getScanStatusBadgeStyle = (status) => {
   switch (status) {
     case "COMPLETED":
