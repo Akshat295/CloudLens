@@ -5,6 +5,7 @@ const ACTION_VARIANTS = {
   danger: "bg-red-600 hover:bg-red-700 focus-visible:ring-red-300",
   warning: "bg-amber-500 hover:bg-amber-600 focus-visible:ring-amber-300",
   success: "bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-emerald-300",
+  primary: "bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-300",
 };
 
 // Shared pill-shaped action button (icon + label, spinner while loading)

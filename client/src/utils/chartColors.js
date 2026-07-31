@@ -26,6 +26,17 @@ export const RESOURCE_STATE_COLORS = {
   stopped: CHART_COLORS.rose,
 };
 
+// 5-tier resource-health palette (Dashboard's ResourceHealthPieChart) — one
+// step darker than CHART_COLORS.red for "critical" so it reads as more
+// severe than plain "high" at a glance.
+export const RESOURCE_HEALTH_COLORS = {
+  CRITICAL: "#991b1b",
+  HIGH: CHART_COLORS.red,
+  MEDIUM: CHART_COLORS.amber,
+  LOW: CHART_COLORS.blue,
+  HEALTHY: CHART_COLORS.emerald,
+};
+
 export const CATEGORICAL_PALETTE = [
   CHART_COLORS.blue,
   CHART_COLORS.emerald,

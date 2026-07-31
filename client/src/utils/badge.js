@@ -92,6 +92,30 @@ export const getCategoryBadgeStyle = (category) => {
   }
 };
 
+export const getScheduleStatusBadgeStyle = (enabled) =>
+  enabled
+    ? { badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200", dotClass: "bg-emerald-500" }
+    : { badgeClass: "bg-slate-50 text-slate-700 border-slate-200", dotClass: "bg-slate-400" };
+
+export const getAuditActionBadgeStyle = (action) => {
+  switch (action) {
+    case "AWS_DISCONNECTED":
+    case "EC2_STOPPED":
+      return { badgeClass: "bg-red-50 text-red-700 border-red-200", dotClass: "bg-red-500" };
+    case "RECOMMENDATION_IGNORED":
+      return { badgeClass: "bg-amber-50 text-amber-700 border-amber-200", dotClass: "bg-amber-500" };
+    case "AWS_CONNECTED":
+    case "SCAN_COMPLETED":
+    case "RECOMMENDATION_RESOLVED":
+      return { badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200", dotClass: "bg-emerald-500" };
+    case "USER_LOGIN":
+    case "SCAN_STARTED":
+      return { badgeClass: "bg-blue-50 text-blue-700 border-blue-200", dotClass: "bg-blue-500" };
+    default:
+      return { badgeClass: "bg-slate-50 text-slate-700 border-slate-200", dotClass: "bg-slate-400" };
+  }
+};
+
 export const getScanStatusBadgeStyle = (status) => {
   switch (status) {
     case "COMPLETED":

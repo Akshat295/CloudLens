@@ -9,42 +9,34 @@ import { formatCurrency } from "../utils/format";
 
 const MAX_SLICES = 6;
 
-// Builds a per-resource cost breakdown from the recommendations already
-// fetched for the dashboard (GET /api/recommendations) — no separate API.
-// Resources beyond the top MAX_SLICES-1 are folded into "Other" so the
-// donut stays readable as the fleet grows.
-const buildCostBreakdown = (recommendations) => {
-  const costed = recommendations
-    .filter((rec) => (rec.monthlyCost || 0) > 0)
-    .map((rec) => ({
-      name: rec.resourceName || rec.resourceId,
-      value: rec.monthlyCost,
-    }))
-    .sort((a, b) => b.value - a.value);
+// Consumes GET /api/dashboard's costBreakdown (one entry per service, $0
+// included for services with no pricing data) instead of deriving cost
+// per-resource client-side. Services beyond MAX_SLICES-1 fold into "Other"
+// so the donut stays readable as more services are scanned.
+const foldIntoSlices = (costBreakdown) => {
+  const sorted = costBreakdown.map((entry) => ({ name: entry.service, value: entry.cost })).sort((a, b) => b.value - a.value);
 
-  if (costed.length <= MAX_SLICES) return costed;
+  if (sorted.length <= MAX_SLICES) return sorted;
 
-  const top = costed.slice(0, MAX_SLICES - 1);
-  const otherTotal = costed
-    .slice(MAX_SLICES - 1)
-    .reduce((sum, entry) => sum + entry.value, 0);
+  const top = sorted.slice(0, MAX_SLICES - 1);
+  const otherTotal = sorted.slice(MAX_SLICES - 1).reduce((sum, entry) => sum + entry.value, 0);
 
   return [...top, { name: "Other", value: otherTotal }];
 };
 
-const CostBreakdownDonutChart = ({ recommendations = [], index, loading = false }) => {
-  const chartData = useMemo(() => buildCostBreakdown(recommendations), [recommendations]);
+const CostBreakdownDonutChart = ({ costBreakdown = [], index, loading = false }) => {
+  const chartData = useMemo(() => foldIntoSlices(costBreakdown), [costBreakdown]);
   const total = chartData.reduce((sum, entry) => sum + entry.value, 0);
 
   return (
     <ChartCard
       title="Cost Breakdown"
-      subtitle={loading ? "Monthly cost by resource" : `Monthly cost by resource · Total ${formatCurrency(total)}`}
+      subtitle={loading ? "Monthly cost by service" : `Monthly cost by service · Total ${formatCurrency(total)}`}
       index={index}
     >
       {loading ? (
         <ChartSkeleton variant="pie" />
-      ) : !chartData.length ? (
+      ) : total === 0 ? (
         <ChartEmptyState message="No cost data yet. Run a scan to see your cost breakdown." />
       ) : (
         <div className="h-[320px] w-full">

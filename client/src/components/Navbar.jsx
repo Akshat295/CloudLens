@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FaCloud,
   FaBolt,
   FaBell,
   FaCircleUser,
+  FaCircleCheck,
+  FaLinkSlash,
+  FaPlug,
+  FaSpinner,
   FaMoon,
   FaSun,
   FaBars,
@@ -15,6 +19,7 @@ import {
 } from "react-icons/fa6";
 import { useTheme } from "../hooks/useTheme";
 import { useClickOutside } from "../hooks/useClickOutside";
+import { useAwsConnection } from "../hooks/useAwsConnection";
 import IconButton from "./IconButton";
 import ScanProgressModal from "./ScanProgressModal";
 
@@ -22,6 +27,10 @@ const NAV_LINKS = [
   { to: "/", label: "Dashboard" },
   { to: "/scan-history", label: "Scan History" },
   { to: "/recommendations", label: "Recommendations" },
+  { to: "/analytics", label: "Analytics" },
+  { to: "/schedules", label: "Scheduled Scans" },
+  { to: "/notifications", label: "Notification Settings" },
+  { to: "/audit-logs", label: "Audit Logs" },
 ];
 
 // motion.create wraps react-router's Link so nav items can use whileHover /
@@ -47,24 +56,34 @@ const dropdownMotionProps = {
 
 const Navbar = ({ onScan, scanning, stepIndex = 0, scanPhase = "idle" }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { connection, loading: awsLoading, disconnecting, disconnect } = useAwsConnection();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [awsOpen, setAwsOpen] = useState(false);
 
   const notifRef = useRef(null);
   const avatarRef = useRef(null);
+  const awsRef = useRef(null);
 
   useClickOutside(notifRef, () => setNotifOpen(false));
   useClickOutside(avatarRef, () => setAvatarOpen(false));
+  useClickOutside(awsRef, () => setAwsOpen(false));
 
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
 
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    navigate("/login");
+  };
+
   const navLinkClass = (to, mobile = false) =>
-    `rounded-lg px-4 py-2 text-sm font-semibold transition ${mobile ? "block" : ""} ${focusRingClass} ${
+    `${mobile ? "block" : "shrink-0"} whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold transition ${focusRingClass} ${
       isPathActive(location.pathname, to)
         ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
         : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
@@ -77,7 +96,7 @@ const Navbar = ({ onScan, scanning, stepIndex = 0, scanPhase = "idle" }) => {
       disabled={scanning}
       whileHover={scanning ? undefined : { scale: 1.03 }}
       whileTap={scanning ? undefined : { scale: 0.97 }}
-      className={`flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-500/20 transition disabled:cursor-not-allowed disabled:opacity-60 ${focusRingClass} ${className}`}
+      className={`flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-500/20 transition disabled:cursor-not-allowed disabled:opacity-60 ${focusRingClass} ${className}`}
     >
       <motion.span
         animate={scanning ? { rotate: 360 } : { rotate: 0 }}
@@ -87,6 +106,21 @@ const Navbar = ({ onScan, scanning, stepIndex = 0, scanPhase = "idle" }) => {
       </motion.span>
       {scanning ? "Scanning..." : "Run Scan"}
     </motion.button>
+  );
+
+  // Shown instead of Run Scan whenever no AWS account is connected — the
+  // scanner rejects a scan without one, so the entry point is replaced
+  // rather than left clickable-but-doomed-to-fail.
+  const connectAwsButton = (className) => (
+    <MotionLink
+      to="/connect-aws"
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      className={`flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-500/20 transition ${focusRingClass} ${className}`}
+    >
+      <FaPlug size={14} />
+      Connect AWS
+    </MotionLink>
   );
 
   return (
@@ -114,7 +148,7 @@ const Navbar = ({ onScan, scanning, stepIndex = 0, scanPhase = "idle" }) => {
           </div>
         </MotionLink>
 
-        <div className="hidden items-center gap-1 lg:flex">
+        <div className="hidden min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] lg:flex [&::-webkit-scrollbar]:hidden">
           {NAV_LINKS.map((link) => (
             <MotionLink
               key={link.to}
@@ -190,6 +224,7 @@ const Navbar = ({ onScan, scanning, stepIndex = 0, scanPhase = "idle" }) => {
                   </motion.button>
                   <motion.button
                     type="button"
+                    onClick={handleLogout}
                     whileHover={{ x: 2 }}
                     className={dropdownItemClass}
                   >
@@ -200,7 +235,56 @@ const Navbar = ({ onScan, scanning, stepIndex = 0, scanPhase = "idle" }) => {
             </AnimatePresence>
           </div>
 
-          {runScanButton("hidden lg:flex")}
+          {!awsLoading && connection && (
+            <div ref={awsRef} className="relative">
+              <IconButton
+                onClick={() => setAwsOpen((open) => !open)}
+                ariaLabel="AWS connection"
+                aria-expanded={awsOpen}
+              >
+                <FaCloud size={16} className="text-emerald-500" />
+                <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              </IconButton>
+
+              <AnimatePresence>
+                {awsOpen && (
+                  <motion.div {...dropdownMotionProps} className={`${dropdownPanelClass} p-1.5`}>
+                    <div className="px-2.5 py-2">
+                      <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                        <FaCircleCheck size={14} /> AWS Connected
+                      </p>
+                      <dl className="mt-1.5 space-y-0.5 text-xs text-slate-500 dark:text-slate-400">
+                        <div className="flex items-center justify-between gap-2">
+                          <dt>Account ID</dt>
+                          <dd className="font-mono text-slate-700 dark:text-slate-200">{connection.accountId}</dd>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <dt>Region</dt>
+                          <dd className="text-slate-700 dark:text-slate-200">{connection.region}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                    <motion.button
+                      type="button"
+                      onClick={disconnect}
+                      disabled={disconnecting}
+                      whileHover={disconnecting ? undefined : { x: 2 }}
+                      className={`${dropdownItemClass} text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-500/10`}
+                    >
+                      {disconnecting ? (
+                        <FaSpinner size={14} className="animate-spin" />
+                      ) : (
+                        <FaLinkSlash size={14} />
+                      )}
+                      {disconnecting ? "Disconnecting..." : "Disconnect"}
+                    </motion.button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {!awsLoading && (connection ? runScanButton("hidden lg:flex") : connectAwsButton("hidden lg:flex"))}
 
           <IconButton
             onClick={() => setMobileOpen((open) => !open)}
@@ -236,7 +320,7 @@ const Navbar = ({ onScan, scanning, stepIndex = 0, scanPhase = "idle" }) => {
                 </MotionLink>
               ))}
 
-              {runScanButton("mt-2")}
+              {!awsLoading && (connection ? runScanButton("mt-2") : connectAwsButton("mt-2"))}
             </div>
           </motion.div>
         )}

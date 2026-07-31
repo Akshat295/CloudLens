@@ -1,17 +1,22 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import Skeleton from "react-loading-skeleton";
+import { FaFileArrowDown } from "react-icons/fa6";
 import Navbar from "../components/Navbar";
 import PageTransition from "../components/PageTransition";
 import Card from "../components/Card";
 import ErrorBanner from "../components/ErrorBanner";
+import ActionButton from "../components/ActionButton";
 import RecommendationTable from "../components/RecommendationTable";
 import ResourceTable from "../components/ResourceTable";
 import { getScanById } from "../services/scan.service";
+import { downloadScanReport } from "../services/report.service";
 import { useAsyncData } from "../hooks/useAsyncData";
 import { useScanTrigger } from "../hooks/useScanTrigger";
 import { formatScanTime, formatCurrency } from "../utils/format";
 import { getScanStatusBadgeClass } from "../utils/badge";
+import { showErrorToast } from "../utils/toast";
 
 const statCardVariants = {
   hidden: { opacity: 0, y: 16 },
@@ -36,6 +41,21 @@ const ScanDetail = () => {
   });
 
   const { scanning, scanError, runScan, stepIndex, scanPhase } = useScanTrigger(refetch);
+
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportReport = async () => {
+    setExporting(true);
+
+    try {
+      await downloadScanReport(scanId);
+    } catch (error) {
+      console.error("Report export failed:", error);
+      showErrorToast(error.response?.data?.message || "Failed to generate report.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleRecommendationUpdate = (updated) => {
     setScanData((prev) => ({
@@ -91,13 +111,23 @@ const ScanDetail = () => {
         </div>
 
         {isLoading ? (
-          <Skeleton width={90} height={30} borderRadius="9999px" />
+          <Skeleton width={200} height={30} borderRadius="9999px" />
         ) : (
-          <span
-            className={`rounded-full px-4 py-1.5 text-sm font-semibold ${getScanStatusBadgeClass(scan.status)}`}
-          >
-            {scan.status}
-          </span>
+          <div className="flex items-center gap-3">
+            <span
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold ${getScanStatusBadgeClass(scan.status)}`}
+            >
+              {scan.status}
+            </span>
+            <ActionButton
+              variant="primary"
+              icon={FaFileArrowDown}
+              label="Export Report"
+              loadingLabel="Generating..."
+              loading={exporting}
+              onClick={handleExportReport}
+            />
+          </div>
         )}
       </motion.div>
 

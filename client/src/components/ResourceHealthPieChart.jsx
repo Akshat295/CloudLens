@@ -3,23 +3,26 @@ import ChartCard from "./ChartCard";
 import ChartTooltip from "./ChartTooltip";
 import ChartEmptyState from "./ChartEmptyState";
 import ChartSkeleton from "./ChartSkeleton";
-import { SEVERITY_COLORS } from "../utils/chartColors";
+import { RESOURCE_HEALTH_COLORS } from "../utils/chartColors";
 
-// Reframes the existing severity counts (highRecommendations/medium/low from
-// GET /api/dashboard) as a resource-health readout.
-const ResourceHealthPieChart = ({ data, index, loading = false }) => {
+// Consumes GET /api/dashboard's severitySummary — five service-agnostic
+// buckets computed across every scanned service's recommendations, not just
+// EC2/IAM/S3/RDS's individual severity counts.
+const ResourceHealthPieChart = ({ severitySummary = {}, index, loading = false }) => {
   const chartData = [
-    { name: "Healthy", value: data.lowRecommendations || 0, color: SEVERITY_COLORS.LOW },
-    { name: "Needs Attention", value: data.mediumRecommendations || 0, color: SEVERITY_COLORS.MEDIUM },
-    { name: "Critical", value: data.highRecommendations || 0, color: SEVERITY_COLORS.HIGH },
-  ];
+    { name: "Critical", value: severitySummary.critical || 0, color: RESOURCE_HEALTH_COLORS.CRITICAL },
+    { name: "High", value: severitySummary.high || 0, color: RESOURCE_HEALTH_COLORS.HIGH },
+    { name: "Medium", value: severitySummary.medium || 0, color: RESOURCE_HEALTH_COLORS.MEDIUM },
+    { name: "Low", value: severitySummary.low || 0, color: RESOURCE_HEALTH_COLORS.LOW },
+    { name: "Healthy", value: severitySummary.healthy || 0, color: RESOURCE_HEALTH_COLORS.HEALTHY },
+  ].filter((entry) => entry.value > 0);
 
   const total = chartData.reduce((sum, entry) => sum + entry.value, 0);
 
   return (
     <ChartCard
       title="Resource Health"
-      subtitle="Recommendation severity across your infrastructure"
+      subtitle="Recommendation severity across every scanned service"
       index={index}
     >
       {loading ? (

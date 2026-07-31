@@ -11,28 +11,34 @@ import {
 } from "recharts";
 import ChartCard from "./ChartCard";
 import ChartTooltip from "./ChartTooltip";
+import ChartEmptyState from "./ChartEmptyState";
 import ChartSkeleton from "./ChartSkeleton";
-import { RESOURCE_STATE_COLORS } from "../utils/chartColors";
+import { CATEGORICAL_PALETTE } from "../utils/chartColors";
 
-const ResourceDistributionBarChart = ({ data, index, loading = false }) => {
-  const chartData = [
-    { name: "Running", count: data.runningResources || 0, color: RESOURCE_STATE_COLORS.running },
-    { name: "Stopped", count: data.stoppedResources || 0, color: RESOURCE_STATE_COLORS.stopped },
-  ];
+// Consumes GET /api/dashboard's resourceDistribution — resource count per
+// service, replacing the old EC2-only Running-vs-Stopped breakdown. One bar
+// per service that showed up in the latest scan; a brand new service just
+// adds another bar automatically.
+const ResourceDistributionBarChart = ({ resourceDistribution = [], index, loading = false }) => {
+  const chartData = resourceDistribution.map((entry) => ({ name: entry.service, count: entry.count }));
 
   // A single <Bar> with per-<Cell> colors doesn't get distinct legend
   // entries automatically in Recharts, so the color key is supplied
-  // explicitly via the Legend's `payload` prop.
-  const legendPayload = chartData.map((entry) => ({
+  // explicitly via the Legend's `payload` prop — same approach the old
+  // Running/Stopped version used, just built from however many services
+  // actually showed up instead of two fixed categories.
+  const legendPayload = chartData.map((entry, i) => ({
     value: entry.name,
     type: "circle",
-    color: entry.color,
+    color: CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length],
   }));
 
   return (
-    <ChartCard title="Resource Distribution" subtitle="Running vs. stopped resources" index={index}>
+    <ChartCard title="Resource Distribution" subtitle="Resources per service" index={index}>
       {loading ? (
         <ChartSkeleton variant="bar" />
+      ) : !chartData.length ? (
+        <ChartEmptyState message="No scanned resources yet. Run a scan to see resource distribution." />
       ) : (
         <div className="h-[320px] w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -55,8 +61,8 @@ const ResourceDistributionBarChart = ({ data, index, loading = false }) => {
                 animationDuration={800}
                 animationEasing="ease-out"
               >
-                {chartData.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
+                {chartData.map((entry, i) => (
+                  <Cell key={entry.name} fill={CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length]} />
                 ))}
               </Bar>
             </BarChart>

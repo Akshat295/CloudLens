@@ -301,17 +301,20 @@ const RecommendationTable = ({
 
                           <td className="px-4 py-3.5" onClick={(event) => event.stopPropagation()}>
                             {item.status === "OPEN" ? (
-                              <div className="flex flex-wrap gap-2">
-                                {item.action === "STOP" && (
-                                  <ActionButton
-                                    variant="danger"
-                                    icon={FaCircleStop}
-                                    label="Stop Instance"
-                                    loadingLabel="Stopping..."
-                                    loading={stoppingId === item._id}
-                                    onClick={() => handleStop(item._id)}
-                                  />
-                                )}
+                              <div className="flex flex-wrap items-center gap-2">
+                                {item.action === "STOP" &&
+                                  (item.state?.toLowerCase() === "stopped" ? (
+                                    <span className="text-xs text-slate-400">Already stopped</span>
+                                  ) : (
+                                    <ActionButton
+                                      variant="danger"
+                                      icon={FaCircleStop}
+                                      label="Stop Instance"
+                                      loadingLabel="Stopping..."
+                                      loading={stoppingId === item._id}
+                                      onClick={() => handleStop(item._id)}
+                                    />
+                                  ))}
 
                                 <ActionButton
                                   variant="warning"

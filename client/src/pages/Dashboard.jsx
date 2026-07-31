@@ -25,6 +25,7 @@ import PageTransition from "../components/PageTransition";
 import HeroSection from "../components/HeroSection";
 import SummaryCard from "../components/SummaryCard";
 import AIInsightsCard from "../components/AIInsightsCard";
+import ServiceOverviewGrid from "../components/ServiceOverviewGrid";
 import ErrorBanner from "../components/ErrorBanner";
 import ResourceHealthPieChart from "../components/ResourceHealthPieChart";
 import CostBreakdownDonutChart from "../components/CostBreakdownDonutChart";
@@ -111,8 +112,12 @@ const Dashboard = () => {
       </div>
 
       <div className="mt-6">
-        <AIInsightsCard insights={dashboardData.insights} loading={isLoading} />
+        <AIInsightsCard insights={dashboardData.aiInsights} loading={isLoading} />
       </div>
+
+      <h2 className="mt-10 mb-4 text-xl font-semibold text-slate-900 dark:text-white">Resources by Service</h2>
+
+      <ServiceOverviewGrid services={dashboardData.serviceSummary} loading={isLoading} />
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         <SummaryCard
@@ -341,10 +346,10 @@ const Dashboard = () => {
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <ResourceHealthPieChart data={dashboardData} index={0} loading={isLoading} />
-        <CostBreakdownDonutChart recommendations={recommendations} index={1} loading={isLoading} />
-        <ResourceDistributionBarChart data={dashboardData} index={2} loading={isLoading} />
-        <SavingsOpportunityBarChart recommendations={recommendations} index={3} loading={isLoading} />
+        <ResourceHealthPieChart severitySummary={dashboardData.severitySummary} index={0} loading={isLoading} />
+        <CostBreakdownDonutChart costBreakdown={dashboardData.costBreakdown} index={1} loading={isLoading} />
+        <ResourceDistributionBarChart resourceDistribution={dashboardData.resourceDistribution} index={2} loading={isLoading} />
+        <SavingsOpportunityBarChart savingsOpportunities={dashboardData.savingsOpportunities} index={3} loading={isLoading} />
       </div>
 
       <RecommendationTable

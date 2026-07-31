@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -17,30 +16,22 @@ import ChartSkeleton from "./ChartSkeleton";
 import { CHART_COLORS } from "../utils/chartColors";
 import { formatCurrency } from "../utils/format";
 
-const MAX_BARS = 8;
 const ROW_HEIGHT = 48;
 const MIN_HEIGHT = 240;
 
-// Ranks resources from the already-fetched recommendations by how much
-// estimated monthly savings each one represents.
-const buildSavingsData = (recommendations) =>
-  recommendations
-    .filter((rec) => (rec.estimatedSavings || 0) > 0)
-    .map((rec) => ({
-      name: rec.resourceName || rec.resourceId,
-      savings: rec.estimatedSavings,
-    }))
-    .sort((a, b) => b.savings - a.savings)
-    .slice(0, MAX_BARS);
-
-const SavingsOpportunityBarChart = ({ recommendations = [], index, loading = false }) => {
-  const chartData = useMemo(() => buildSavingsData(recommendations), [recommendations]);
+// Consumes GET /api/dashboard's savingsOpportunities as-is — already
+// service-agnostic, already sorted highest-savings-first (with $0
+// configuration-only recommendations naturally sorted last), and already
+// capped to a reasonable count server-side, so this component just renders
+// what it's given instead of filtering/sorting recommendations itself.
+const SavingsOpportunityBarChart = ({ savingsOpportunities = [], index, loading = false }) => {
+  const chartData = savingsOpportunities.map((entry) => ({ name: entry.resource, savings: entry.savings }));
   const height = Math.max(MIN_HEIGHT, chartData.length * ROW_HEIGHT);
 
   return (
     <ChartCard
       title="Savings Opportunities"
-      subtitle="Top resources by potential monthly savings"
+      subtitle="Top recommendations by potential monthly savings, across every service"
       index={index}
     >
       {loading ? (

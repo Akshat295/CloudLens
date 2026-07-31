@@ -27,6 +27,28 @@ export const formatActionLabel = (action) =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 
+// Human-readable labels for AuditLog.action. Same fallback strategy as
+// formatActionLabel above, plus explicit entries for the few values whose
+// title-cased form would read oddly ("Aws"/"Ec2" instead of "AWS"/"EC2").
+const AUDIT_ACTION_LABELS = {
+  USER_LOGIN: "User Login",
+  AWS_CONNECTED: "AWS Connected",
+  AWS_DISCONNECTED: "AWS Disconnected",
+  SCAN_STARTED: "Scan Started",
+  SCAN_COMPLETED: "Scan Completed",
+  RECOMMENDATION_IGNORED: "Recommendation Ignored",
+  RECOMMENDATION_RESOLVED: "Recommendation Resolved",
+  EC2_STOPPED: "EC2 Stopped",
+};
+
+export const formatAuditActionLabel = (action) =>
+  AUDIT_ACTION_LABELS[action] ||
+  (action || "")
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
 export const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`;
 
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"];

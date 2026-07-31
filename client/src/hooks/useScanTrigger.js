@@ -48,7 +48,7 @@ export const useScanTrigger = (onSuccess) => {
       window.clearInterval(timerRef.current);
       console.error("Scan failed:", error);
 
-      const message = "Scan failed. Check backend logs and AWS credentials.";
+      const message = error.response?.data?.message || "Scan failed. Check backend logs and AWS credentials.";
       setScanError(message);
       setScanPhase("error");
       showErrorToast(message);

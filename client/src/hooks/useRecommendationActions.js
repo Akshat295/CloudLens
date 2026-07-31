@@ -28,7 +28,7 @@ export const useRecommendationActions = (onRecommendationUpdate, refresh) => {
       showSuccessToast(successMessage);
     } catch (error) {
       console.error(errorMessage, error);
-      showErrorToast(errorMessage);
+      showErrorToast(error.response?.data?.message || errorMessage);
     } finally {
       setLoadingId(null);
     }

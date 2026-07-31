@@ -569,16 +569,19 @@ const ResourceDetailsDrawer = ({
                   transition={{ delay: 0.4, duration: 0.3, ease: "easeOut" }}
                   className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-6 py-4"
                 >
-                  {resource.action === "STOP" && (
-                    <ActionButton
-                      variant="danger"
-                      icon={FaCircleStop}
-                      label="Stop Instance"
-                      loadingLabel="Stopping..."
-                      loading={stoppingId === resource._id}
-                      onClick={() => onStop(resource._id)}
-                    />
-                  )}
+                  {resource.action === "STOP" &&
+                    (resource.state?.toLowerCase() === "stopped" ? (
+                      <span className="text-xs text-slate-400">Instance already stopped</span>
+                    ) : (
+                      <ActionButton
+                        variant="danger"
+                        icon={FaCircleStop}
+                        label="Stop Instance"
+                        loadingLabel="Stopping..."
+                        loading={stoppingId === resource._id}
+                        onClick={() => onStop(resource._id)}
+                      />
+                    ))}
 
                   <ActionButton
                     variant="warning"
