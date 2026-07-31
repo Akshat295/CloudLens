@@ -6,10 +6,12 @@ const enrichRecommendationsWithResources = async (recommendations) => {
   if (!recommendations.length) return [];
 
   const scanId = recommendations[0].scanId;
+  const userId = recommendations[0].userId;
   const resourceIds = recommendations.map((rec) => rec.resourceId);
 
   const resources = await Resource.find({
     scanId,
+    userId,
     resourceId: { $in: resourceIds },
   });
 
@@ -52,16 +54,16 @@ const saveRecommendation = async (recommendationData) => {
   return await Recommendation.create(recommendationData);
 };
 
-const getRecommendationsByScanId = async (scanId) => {
-  const recommendations = await Recommendation.find({ scanId }).sort({
+const getRecommendationsByScanId = async (scanId, userId) => {
+  const recommendations = await Recommendation.find({ scanId, userId }).sort({
     createdAt: -1,
   });
 
   return await enrichRecommendationsWithResources(recommendations);
 };
 
-const getLatestRecommendations = async () => {
-  const latestScan = await Scan.findOne().sort({
+const getLatestRecommendations = async (userId) => {
+  const latestScan = await Scan.findOne({ userId }).sort({
     createdAt: -1,
   });
 
@@ -69,6 +71,7 @@ const getLatestRecommendations = async () => {
 
   const recommendations = await Recommendation.find({
     scanId: latestScan._id,
+    userId,
   }).sort({
     createdAt: -1,
   });
@@ -76,13 +79,13 @@ const getLatestRecommendations = async () => {
   return await enrichRecommendationsWithResources(recommendations);
 };
 
-const getRecommendationById = async (id) => {
-  return await Recommendation.findById(id);
+const getRecommendationById = async (id, userId) => {
+  return await Recommendation.findOne({ _id: id, userId });
 };
 
-const ignoreRecommendation = async (id) => {
-  return await Recommendation.findByIdAndUpdate(
-    id,
+const ignoreRecommendation = async (id, userId) => {
+  return await Recommendation.findOneAndUpdate(
+    { _id: id, userId },
     {
       status: "IGNORED",
     },
@@ -92,9 +95,9 @@ const ignoreRecommendation = async (id) => {
   );
 };
 
-const resolveRecommendation = async (id) => {
-  return await Recommendation.findByIdAndUpdate(
-    id,
+const resolveRecommendation = async (id, userId) => {
+  return await Recommendation.findOneAndUpdate(
+    { _id: id, userId },
     {
       status: "RESOLVED",
     },

@@ -7,13 +7,31 @@ const HIGH_CPU_THRESHOLD = 80;
 // value changed, from fixed 95/90/99 constants to the weighted score
 // (Feature 7). `averageCPU` stays a plain number; the extra signals are
 // optional so nothing else calling this with just CPU data breaks.
+//
+// `isRunning` guards against a false "STOP to save $X" verdict: a stopped
+// instance has no CloudWatch datapoints, so averageCPU resolves to 0 (see
+// cpu.analyzer.js) — indistinguishable from "running but idle" unless the
+// actual instance state is checked first. AWS doesn't bill compute time on
+// a stopped instance, so there's no cost left to "save" by stopping it
+// again.
 const getEC2Recommendation = ({
   averageCPU,
   avgNetworkIn = 0,
   avgNetworkOut = 0,
   diskTotal = 0,
   instanceAgeDays = 0,
+  isRunning = true,
 }) => {
+  if (!isRunning) {
+    return {
+      severity: "LOW",
+      action: "NONE",
+      confidence: 100,
+      recommendation: "Instance is already stopped — no active compute cost.",
+      reason: "Instance state is not running, so CPU utilization cannot be measured.",
+    };
+  }
+
   const confidence = calculateEC2ConfidenceScore({
     averageCPU,
     avgNetworkTotal: avgNetworkIn + avgNetworkOut,
@@ -75,8 +93,21 @@ const getEC2Recommendation = ({
 const LOW_NETWORK_BYTES_THRESHOLD = 1_000_000; // ~1MB/hr average — negligible traffic
 const HIGH_NETWORK_BYTES_THRESHOLD = 50_000_000; // ~50MB/hr average — meaningfully active
 
-const getNetworkRecommendation = ({ averageCPU, avgNetworkIn, avgNetworkOut }) => {
+const getNetworkRecommendation = ({ averageCPU, avgNetworkIn, avgNetworkOut, isRunning = true }) => {
   const totalNetwork = avgNetworkIn + avgNetworkOut;
+
+  // Same root cause as getEC2Recommendation's isRunning guard: a stopped
+  // instance has no CloudWatch data, so every one of these "idle" checks
+  // would fire for a reason that has nothing to do with actual utilization.
+  if (!isRunning) {
+    return {
+      severity: "LOW",
+      action: "NONE",
+      confidence: 100,
+      recommendation: "Network utilization is healthy.",
+      reason: "Instance is stopped — no network activity to measure.",
+    };
+  }
 
   if (averageCPU < IDLE_CPU_THRESHOLD && totalNetwork < LOW_NETWORK_BYTES_THRESHOLD) {
     return {
@@ -111,10 +142,20 @@ const getNetworkRecommendation = ({ averageCPU, avgNetworkIn, avgNetworkOut }) =
 const LOW_DISK_BYTES_THRESHOLD = 1_000_000;
 const HIGH_DISK_OPS_THRESHOLD = 1000;
 
-const getDiskRecommendation = ({ averageCPU, avgNetworkIn, avgNetworkOut, diskAnalysis }) => {
+const getDiskRecommendation = ({ averageCPU, avgNetworkIn, avgNetworkOut, diskAnalysis, isRunning = true }) => {
   const totalNetwork = avgNetworkIn + avgNetworkOut;
   const totalDiskBytes = diskAnalysis.avgDiskReadBytes + diskAnalysis.avgDiskWriteBytes;
   const totalDiskOps = diskAnalysis.avgDiskReadOps + diskAnalysis.avgDiskWriteOps;
+
+  if (!isRunning) {
+    return {
+      severity: "LOW",
+      action: "NONE",
+      confidence: 100,
+      recommendation: "Disk I/O is healthy.",
+      reason: "Instance is stopped — no disk activity to measure.",
+    };
+  }
 
   if (
     averageCPU < IDLE_CPU_THRESHOLD &&

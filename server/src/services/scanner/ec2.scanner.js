@@ -80,7 +80,7 @@ const getElasticIPInstanceIds = (addresses) =>
 // back to the current monthly cost — meaning "no known change" — whenever
 // the target type can't be determined or its price can't be fetched, rather
 // than guessing.
-const getOptimizedMonthlyCost = async (instance, action, currentMonthlyCost) => {
+const getOptimizedMonthlyCost = async (pricingClient, instance, action, currentMonthlyCost) => {
   if (action !== "UPSIZE" && action !== "DOWNSIZE") return currentMonthlyCost;
 
   const targetInstanceType = getAdjacentInstanceType(instance.instanceType, action === "UPSIZE" ? "up" : "down");
@@ -88,7 +88,7 @@ const getOptimizedMonthlyCost = async (instance, action, currentMonthlyCost) => 
 
   try {
     const pricingFilters = buildEC2PricingFilters({ ...instance, instanceType: targetInstanceType });
-    const pricingResponse = await getEC2Pricing(pricingFilters);
+    const pricingResponse = await getEC2Pricing(pricingClient, pricingFilters);
     const hourlyPrice = extractHourlyPrice(pricingResponse);
 
     return hourlyPrice > 0 ? calculateMonthlyCost(hourlyPrice) : currentMonthlyCost;
@@ -121,11 +121,13 @@ const logInstanceScanResult = (
 // Analyzes a single EC2 instance (CPU, network, disk, age, security groups,
 // EBS volumes, Elastic IP, pricing), persists ONE merged recommendation for
 // it, and returns the enriched Resource record + savings it contributes.
-const processInstance = async (scanId, instance, volumesByInstance, elasticIpInstanceIds) => {
+const processInstance = async (scanId, userId, clients, instance, volumesByInstance, elasticIpInstanceIds) => {
+  const { cloudWatchClient, pricingClient } = clients;
+
   const [cpuValues, extendedMetrics, pricingResponse] = await Promise.all([
-    getCPUUtilization(instance.instanceId),
-    getNetworkAndDiskMetrics(instance.instanceId),
-    getEC2Pricing(buildEC2PricingFilters(instance)),
+    getCPUUtilization(cloudWatchClient, instance.instanceId),
+    getNetworkAndDiskMetrics(cloudWatchClient, instance.instanceId),
+    getEC2Pricing(pricingClient, buildEC2PricingFilters(instance)),
   ]);
 
   const averageCPU = calculateAverageCPU(cpuValues);
@@ -133,6 +135,13 @@ const processInstance = async (scanId, instance, volumesByInstance, elasticIpIns
   const diskAnalysis = analyzeDiskIO(extendedMetrics);
   const instanceAgeDays = calculateInstanceAgeDays(instance.launchTime);
   const securityGroupAnalysis = analyzeSecurityGroups(instance.securityGroups);
+
+  // A stopped instance has no CloudWatch datapoints, so averageCPU reads as
+  // 0 — exactly what an idle-but-running instance also looks like. Without
+  // this check, an already-stopped instance would get a "STOP to save $X"
+  // recommendation quoting its full running cost as "savings", even though
+  // AWS isn't charging any compute cost for it right now.
+  const isRunning = instance.state === "running";
 
   const instanceVolumes = volumesByInstance.get(instance.instanceId) || [];
   const ebsAnalysis = analyzeEBSVolumes(instanceVolumes);
@@ -143,7 +152,7 @@ const processInstance = async (scanId, instance, volumesByInstance, elasticIpIns
   });
 
   const hourlyPrice = extractHourlyPrice(pricingResponse);
-  const monthlyCost = calculateMonthlyCost(hourlyPrice);
+  const monthlyCost = isRunning ? calculateMonthlyCost(hourlyPrice) : 0;
 
   const baseRecommendation = getEC2Recommendation({
     averageCPU,
@@ -151,6 +160,7 @@ const processInstance = async (scanId, instance, volumesByInstance, elasticIpIns
     avgNetworkOut: networkAnalysis.avgNetworkOut,
     diskTotal: diskAnalysis.avgDiskReadBytes + diskAnalysis.avgDiskWriteBytes,
     instanceAgeDays,
+    isRunning,
   });
 
   const estimatedSavings = calculateEstimatedSavings(monthlyCost, baseRecommendation.action);
@@ -159,6 +169,7 @@ const processInstance = async (scanId, instance, volumesByInstance, elasticIpIns
     averageCPU,
     avgNetworkIn: networkAnalysis.avgNetworkIn,
     avgNetworkOut: networkAnalysis.avgNetworkOut,
+    isRunning,
   });
 
   const diskRecommendation = getDiskRecommendation({
@@ -166,6 +177,7 @@ const processInstance = async (scanId, instance, volumesByInstance, elasticIpIns
     avgNetworkIn: networkAnalysis.avgNetworkIn,
     avgNetworkOut: networkAnalysis.avgNetworkOut,
     diskAnalysis,
+    isRunning,
   });
 
   const ageRecommendation = getInstanceAgeRecommendation(instanceAgeDays);
@@ -173,7 +185,7 @@ const processInstance = async (scanId, instance, volumesByInstance, elasticIpIns
   const ebsRecommendation = getEBSRecommendation(ebsAnalysis);
   const elasticIpRecommendation = getElasticIPRecommendation(elasticIpStatus);
 
-  const optimizedMonthlyCost = await getOptimizedMonthlyCost(instance, baseRecommendation.action, monthlyCost);
+  const optimizedMonthlyCost = await getOptimizedMonthlyCost(pricingClient, instance, baseRecommendation.action, monthlyCost);
   const costComparison = calculateCostComparison(baseRecommendation.action, monthlyCost, optimizedMonthlyCost);
 
   const mergedRecommendation = mergeEC2Recommendations({
@@ -190,6 +202,7 @@ const processInstance = async (scanId, instance, volumesByInstance, elasticIpIns
 
   await saveRecommendation({
     scanId,
+    userId,
     resourceId: instance.instanceId,
     severity: mergedRecommendation.severity,
     action: mergedRecommendation.action,
@@ -244,11 +257,13 @@ const processInstance = async (scanId, instance, volumesByInstance, elasticIpIns
   };
 };
 
-const scanEC2 = async (scanId) => {
+const scanEC2 = async (scanId, userId, clients) => {
+  const { ec2Client } = clients;
+
   const [ec2Instances, volumes, elasticIpAddresses] = await Promise.all([
-    getEC2Instances(),
-    getEBSVolumes(),
-    getElasticIPAddresses(),
+    getEC2Instances(ec2Client),
+    getEBSVolumes(ec2Client),
+    getElasticIPAddresses(ec2Client),
   ]);
 
   const volumesByInstance = groupVolumesByInstance(volumes);
@@ -260,6 +275,8 @@ const scanEC2 = async (scanId) => {
   for (const instance of ec2Instances) {
     const { resource, estimatedSavings } = await processInstance(
       scanId,
+      userId,
+      clients,
       instance,
       volumesByInstance,
       elasticIpInstanceIds
@@ -269,7 +286,7 @@ const scanEC2 = async (scanId) => {
     totalSavings += estimatedSavings;
   }
 
-  await saveResources(scanId, "EC2", instanceResources);
+  await saveResources(scanId, "EC2", instanceResources, userId);
 
   return {
     totalResources: ec2Instances.length,

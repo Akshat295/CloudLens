@@ -2,11 +2,7 @@ const {
   GetProductsCommand,
 } = require("@aws-sdk/client-pricing");
 
-const {
-  pricingClient,
-} = require("../../config/aws");
-
-const getEC2Pricing = async (pricingFilters) => {
+const getEC2Pricing = async (pricingClient, pricingFilters) => {
   const command = new GetProductsCommand({
     ServiceCode: "AmazonEC2",
 
@@ -51,7 +47,7 @@ const getEC2Pricing = async (pricingFilters) => {
   return response;
 };
 
-const getS3Pricing = async (pricingFilters) => {
+const getS3Pricing = async (pricingClient, pricingFilters) => {
   const command = new GetProductsCommand({
     ServiceCode: "AmazonS3",
 
@@ -81,7 +77,7 @@ const getS3Pricing = async (pricingFilters) => {
   return response;
 };
 
-const getRDSPricing = async (pricingFilters) => {
+const getRDSPricing = async (pricingClient, pricingFilters) => {
   const command = new GetProductsCommand({
     ServiceCode: "AmazonRDS",
 

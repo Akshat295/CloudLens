@@ -96,7 +96,23 @@ const getRDSMultiAZRecommendation = (multiAZ) => {
 // as specified) and very low CPU, which suggests the instance class is
 // oversized for its workload — bucketed at the same MEDIUM tier since it's
 // the same underlying CPU-utilization analysis, just the opposite signal.
-const getRDSCPURecommendation = ({ averageCPU, isIdle, isHighCPU }) => {
+//
+// `isRunning` guards the same false-signal case fixed for EC2: a stopped RDS
+// instance has no CloudWatch datapoints, so averageCPU reads as 0 — reading
+// that as "idle, downsize to save X%" would be wrong since AWS isn't
+// charging compute for a stopped instance in the first place.
+const getRDSCPURecommendation = ({ averageCPU, isIdle, isHighCPU, isRunning = true }) => {
+  if (!isRunning) {
+    return {
+      severity: "LOW",
+      action: "NONE",
+      confidence: 100,
+      recommendation: "Database instance is stopped — no active compute cost.",
+      reason: "Instance status is not available/running, so CPU utilization cannot be measured.",
+      savingsRate: 0,
+    };
+  }
+
   if (isIdle) {
     return {
       severity: "MEDIUM",

@@ -9,16 +9,15 @@ const {
   GetBucketPolicyCommand,
 } = require("@aws-sdk/client-s3");
 
-const { s3Client } = require("../../config/aws");
 const { mapS3Buckets } = require("../../mappers/s3.mapper");
 
-const getBuckets = async () => {
+const getBuckets = async (s3Client) => {
   const response = await s3Client.send(new ListBucketsCommand({}));
 
   return mapS3Buckets(response);
 };
 
-const getBucketRegion = async (bucketName) => {
+const getBucketRegion = async (s3Client, bucketName) => {
   try {
     const response = await s3Client.send(
       new GetBucketLocationCommand({ Bucket: bucketName })
@@ -36,7 +35,7 @@ const getBucketRegion = async (bucketName) => {
 // settings are enabled. If no configuration exists at all, AWS throws
 // NoSuchPublicAccessBlockConfiguration, which itself means nothing is
 // blocking public access.
-const isBucketPublic = async (bucketName) => {
+const isBucketPublic = async (s3Client, bucketName) => {
   try {
     const response = await s3Client.send(
       new GetPublicAccessBlockCommand({ Bucket: bucketName })
@@ -61,7 +60,7 @@ const isBucketPublic = async (bucketName) => {
   }
 };
 
-const isVersioningEnabled = async (bucketName) => {
+const isVersioningEnabled = async (s3Client, bucketName) => {
   try {
     const response = await s3Client.send(
       new GetBucketVersioningCommand({ Bucket: bucketName })
@@ -83,7 +82,7 @@ const isVersioningEnabled = async (bucketName) => {
 // s3.analyzer.js's analyzeLifecycleRules() is what actually inspects the
 // returned rules (transitions, expiration, multipart cleanup, etc.) — kept
 // separate so this stays a plain fetch, mirroring getBucketPolicy above.
-const getLifecycleRules = async (bucketName) => {
+const getLifecycleRules = async (s3Client, bucketName) => {
   try {
     const response = await s3Client.send(
       new GetBucketLifecycleConfigurationCommand({ Bucket: bucketName })
@@ -108,7 +107,7 @@ const getLifecycleRules = async (bucketName) => {
 // hasLifecycleRules above — we fall back to AWS's account-wide default
 // (SSE-S3/AES256 has been applied to every bucket automatically since
 // January 2023) instead of raising a false "unencrypted" alarm.
-const getBucketEncryption = async (bucketName) => {
+const getBucketEncryption = async (s3Client, bucketName) => {
   try {
     const response = await s3Client.send(
       new GetBucketEncryptionCommand({ Bucket: bucketName })
@@ -139,7 +138,7 @@ const getBucketEncryption = async (bucketName) => {
 // ReplicationConfigurationNotFoundError, a definitive "not configured"
 // answer. Any other failure means we can't tell, so we default to `false`
 // rather than raise a false "unnecessary replication" flag.
-const hasReplicationConfigured = async (bucketName) => {
+const hasReplicationConfigured = async (s3Client, bucketName) => {
   try {
     const response = await s3Client.send(
       new GetBucketReplicationCommand({ Bucket: bucketName })
@@ -162,7 +161,7 @@ const hasReplicationConfigured = async (bucketName) => {
 // permission, etc.) also resolves to `null`: a policy we can't read can't
 // be safely evaluated for wildcard/public grants, so it's treated the same
 // as "nothing to inspect" rather than guessed at.
-const getBucketPolicy = async (bucketName) => {
+const getBucketPolicy = async (s3Client, bucketName) => {
   try {
     const response = await s3Client.send(
       new GetBucketPolicyCommand({ Bucket: bucketName })

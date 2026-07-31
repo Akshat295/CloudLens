@@ -2,8 +2,8 @@ const Scan = require("../../models/Scan");
 const Resource = require("../../models/Resource");
 const Recommendation = require("../../models/Recommendation");
 
-const getDashboardSummary = async () => {
-  const latestScan = await Scan.findOne().sort({
+const getDashboardSummary = async (userId) => {
+  const latestScan = await Scan.findOne({ userId }).sort({
     createdAt: -1,
   });
 
@@ -24,6 +24,7 @@ const getDashboardSummary = async () => {
     {
       $match: {
         scanId: latestScan._id,
+        userId: latestScan.userId,
       },
     },
     {
@@ -64,10 +65,14 @@ const getDashboardSummary = async () => {
       {
         $match: {
           scanId: latestScan._id,
+          userId: latestScan.userId,
         },
       },
       {
         $facet: {
+          // Real infrastructure spend — stays unfiltered by status. Marking
+          // a recommendation resolved/ignored is a tracking action, not an
+          // AWS change, so it doesn't reduce what's actually being billed.
           totalMonthlyCost: [
             {
               $group: {
@@ -79,7 +84,15 @@ const getDashboardSummary = async () => {
             },
           ],
 
+          // "Potential savings if you act on outstanding recommendations" —
+          // a resolved one is already acted on, an ignored one was
+          // explicitly dismissed, so neither should keep counting here.
           totalEstimatedSavings: [
+            {
+              $match: {
+                status: "OPEN",
+              },
+            },
             {
               $group: {
                 _id: null,
@@ -94,6 +107,7 @@ const getDashboardSummary = async () => {
             {
               $match: {
                 severity: "HIGH",
+                status: "OPEN",
               },
             },
             {
@@ -105,6 +119,7 @@ const getDashboardSummary = async () => {
             {
               $match: {
                 severity: "MEDIUM",
+                status: "OPEN",
               },
             },
             {
@@ -116,6 +131,7 @@ const getDashboardSummary = async () => {
             {
               $match: {
                 severity: "LOW",
+                status: "OPEN",
               },
             },
             {
@@ -181,8 +197,8 @@ const EMPTY_EC2_FLEET_STATS = {
   totalVolumes: 0,
 };
 
-const getEC2FleetStats = async () => {
-  const latestScan = await Scan.findOne().sort({
+const getEC2FleetStats = async (userId) => {
+  const latestScan = await Scan.findOne({ userId }).sort({
     createdAt: -1,
   });
 
@@ -190,6 +206,7 @@ const getEC2FleetStats = async () => {
 
   const ec2Resources = await Resource.find({
     scanId: latestScan._id,
+    userId,
     resourceType: "EC2",
   });
 
@@ -250,16 +267,16 @@ const EMPTY_IAM_FLEET_STATS = {
   highRiskUsers: 0,
 };
 
-const getIAMFleetStats = async () => {
-  const latestScan = await Scan.findOne().sort({
+const getIAMFleetStats = async (userId) => {
+  const latestScan = await Scan.findOne({ userId }).sort({
     createdAt: -1,
   });
 
   if (!latestScan) return { ...EMPTY_IAM_FLEET_STATS };
 
   const [userResources, roleResources] = await Promise.all([
-    Resource.find({ scanId: latestScan._id, resourceType: "IAM_USER" }),
-    Resource.find({ scanId: latestScan._id, resourceType: "IAM_ROLE" }),
+    Resource.find({ scanId: latestScan._id, userId, resourceType: "IAM_USER" }),
+    Resource.find({ scanId: latestScan._id, userId, resourceType: "IAM_ROLE" }),
   ]);
 
   if (!userResources.length && !roleResources.length) return { ...EMPTY_IAM_FLEET_STATS };
@@ -301,8 +318,8 @@ const EMPTY_CATEGORY_COUNTS = {
   operationalExcellenceFindings: 0,
 };
 
-const getRecommendationCategoryCounts = async () => {
-  const latestScan = await Scan.findOne().sort({
+const getRecommendationCategoryCounts = async (userId) => {
+  const latestScan = await Scan.findOne({ userId }).sort({
     createdAt: -1,
   });
 
@@ -312,7 +329,9 @@ const getRecommendationCategoryCounts = async () => {
     {
       $match: {
         scanId: latestScan._id,
+        userId: latestScan.userId,
         action: { $ne: "NONE" },
+        status: "OPEN",
       },
     },
     {

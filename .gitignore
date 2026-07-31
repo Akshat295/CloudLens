@@ -16,3 +16,8 @@ node_modules/
 # OS
 .DS_Store
 Thumbs.db
+
+# Stray credential dumps (defense in depth — never commit real AWS keys)
+aws_creds.json
+**/aws_creds.json
+*_creds.json

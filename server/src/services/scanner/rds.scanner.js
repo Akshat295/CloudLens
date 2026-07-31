@@ -40,15 +40,23 @@ const logInstanceScanResult = (instance, { analysis, hourlyPrice, monthlyCost, e
 // pricing), persists ONE merged recommendation for it (mirroring the
 // established one-resource-one-recommendation shape from EC2/S3), and
 // returns the Resource record + savings it contributes.
-const processDBInstance = async (scanId, instance) => {
+const processDBInstance = async (scanId, userId, clients, instance) => {
+  const { cloudWatchClient, pricingClient } = clients;
+
   const [cpuValues, pricingResponse] = await Promise.all([
-    getRDSCPUUtilization(instance.dbInstanceIdentifier),
-    getRDSPricing(buildRDSPricingFilters(instance)),
+    getRDSCPUUtilization(cloudWatchClient, instance.dbInstanceIdentifier),
+    getRDSPricing(pricingClient, buildRDSPricingFilters(instance)),
   ]);
 
   const averageCPU = calculateAverageCPU(cpuValues);
   const hourlyPrice = extractHourlyPrice(pricingResponse);
-  const monthlyCost = calculateRDSMonthlyCost(hourlyPrice, instance.allocatedStorage);
+
+  // A stopped RDS instance has no CloudWatch datapoints (averageCPU reads as
+  // 0, indistinguishable from "running but idle") and isn't being billed for
+  // compute — only its storage cost, if any, keeps accruing. Same root
+  // cause/fix as the EC2 stopped-instance bug.
+  const isRunning = instance.status === "available";
+  const monthlyCost = calculateRDSMonthlyCost(isRunning ? hourlyPrice : 0, instance.allocatedStorage);
 
   const analysis = analyzeRDSConfiguration({
     publiclyAccessible: instance.publiclyAccessible,
@@ -65,7 +73,7 @@ const processDBInstance = async (scanId, instance) => {
   const encryptionRecommendation = getRDSEncryptionRecommendation(analysis.storageEncrypted);
   const backupRecommendation = getRDSBackupRecommendation(analysis);
   const multiAZRecommendation = getRDSMultiAZRecommendation(analysis.multiAZ);
-  const cpuRecommendation = getRDSCPURecommendation(analysis);
+  const cpuRecommendation = getRDSCPURecommendation({ ...analysis, isRunning });
   const storageTypeRecommendation = getRDSStorageTypeRecommendation(analysis.isGp2);
   const engineVersionRecommendation = getRDSEngineVersionRecommendation({
     engineVersionIsOld: analysis.engineVersionIsOld,
@@ -89,6 +97,7 @@ const processDBInstance = async (scanId, instance) => {
 
   await saveRecommendation({
     scanId,
+    userId,
     resourceId: instance.dbInstanceIdentifier,
     severity: mergedRecommendation.severity,
     action: mergedRecommendation.action,
@@ -129,20 +138,22 @@ const processDBInstance = async (scanId, instance) => {
   };
 };
 
-const scanRDS = async (scanId) => {
-  const dbInstances = await getDBInstances();
+const scanRDS = async (scanId, userId, clients) => {
+  const { rdsClient } = clients;
+
+  const dbInstances = await getDBInstances(rdsClient);
 
   const instanceResources = [];
   let totalSavings = 0;
 
   for (const instance of dbInstances) {
-    const { resource, estimatedSavings } = await processDBInstance(scanId, instance);
+    const { resource, estimatedSavings } = await processDBInstance(scanId, userId, clients, instance);
 
     instanceResources.push(resource);
     totalSavings += estimatedSavings;
   }
 
-  await saveResources(scanId, "RDS", instanceResources);
+  await saveResources(scanId, "RDS", instanceResources, userId);
 
   return {
     totalResources: dbInstances.length,

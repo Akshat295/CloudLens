@@ -19,17 +19,16 @@ const {
   GetAccountSummaryCommand,
 } = require("@aws-sdk/client-iam");
 
-const { iamClient } = require("../../config/aws");
 const { mapIAMUsers, mapIAMRoles } = require("../../mappers/iam.mapper");
 const { parsePolicyDocument, isCustomerManagedPolicyArn } = require("../../utils/iamPolicy.util");
 
-const getUsers = async () => {
+const getUsers = async (iamClient) => {
   const response = await iamClient.send(new ListUsersCommand({}));
 
   return mapIAMUsers(response);
 };
 
-const getRoles = async () => {
+const getRoles = async (iamClient) => {
   const response = await iamClient.send(new ListRolesCommand({}));
 
   return mapIAMRoles(response);
@@ -44,7 +43,7 @@ const getRoles = async () => {
 // permission gap we default to "fine" (MFA enabled, no access keys)
 // rather than raise a false root-account alarm — same graceful-
 // degradation convention used throughout s3.service.js.
-const getRootAccountSecuritySummary = async () => {
+const getRootAccountSecuritySummary = async (iamClient) => {
   try {
     const response = await iamClient.send(new GetAccountSummaryCommand({}));
     const summary = response.SummaryMap || {};
@@ -63,7 +62,7 @@ const getRootAccountSecuritySummary = async () => {
 // (API-only user) — a definitive, non-error answer. Any other failure
 // means we can't tell, so we default to `false` (no console access) rather
 // than raise a false "console user without MFA" alarm.
-const hasConsoleAccess = async (userName) => {
+const hasConsoleAccess = async (iamClient, userName) => {
   try {
     await iamClient.send(new GetLoginProfileCommand({ UserName: userName }));
     return true;
@@ -75,7 +74,7 @@ const hasConsoleAccess = async (userName) => {
   }
 };
 
-const hasUserMFA = async (userName) => {
+const hasUserMFA = async (iamClient, userName) => {
   try {
     const response = await iamClient.send(new ListMFADevicesCommand({ UserName: userName }));
 
@@ -86,7 +85,7 @@ const hasUserMFA = async (userName) => {
   }
 };
 
-const getAttachedUserPolicies = async (userName) => {
+const getAttachedUserPolicies = async (iamClient, userName) => {
   try {
     const response = await iamClient.send(new ListAttachedUserPoliciesCommand({ UserName: userName }));
 
@@ -104,7 +103,7 @@ const getAttachedUserPolicies = async (userName) => {
 // their document is fetched directly per policy name — unlike attached
 // managed policies, which would need a GetPolicy + GetPolicyVersion round
 // trip per policy just to resolve the current default version's document.
-const getInlineUserPolicies = async (userName) => {
+const getInlineUserPolicies = async (iamClient, userName) => {
   try {
     const response = await iamClient.send(new ListUserPoliciesCommand({ UserName: userName }));
     const policyNames = response.PolicyNames || [];
@@ -129,7 +128,7 @@ const getInlineUserPolicies = async (userName) => {
   }
 };
 
-const getUserGroups = async (userName) => {
+const getUserGroups = async (iamClient, userName) => {
   try {
     const response = await iamClient.send(new ListGroupsForUserCommand({ UserName: userName }));
 
@@ -140,7 +139,7 @@ const getUserGroups = async (userName) => {
   }
 };
 
-const getUserAccessKeys = async (userName) => {
+const getUserAccessKeys = async (iamClient, userName) => {
   try {
     const response = await iamClient.send(new ListAccessKeysCommand({ UserName: userName }));
     const keys = response.AccessKeyMetadata || [];
@@ -172,7 +171,7 @@ const getUserAccessKeys = async (userName) => {
   }
 };
 
-const getUserTags = async (userName) => {
+const getUserTags = async (iamClient, userName) => {
   try {
     const response = await iamClient.send(new ListUserTagsCommand({ UserName: userName }));
 
@@ -183,7 +182,7 @@ const getUserTags = async (userName) => {
   }
 };
 
-const getAttachedRolePolicies = async (roleName) => {
+const getAttachedRolePolicies = async (iamClient, roleName) => {
   try {
     const response = await iamClient.send(new ListAttachedRolePoliciesCommand({ RoleName: roleName }));
 
@@ -197,7 +196,7 @@ const getAttachedRolePolicies = async (roleName) => {
   }
 };
 
-const getInlineRolePolicies = async (roleName) => {
+const getInlineRolePolicies = async (iamClient, roleName) => {
   try {
     const response = await iamClient.send(new ListRolePoliciesCommand({ RoleName: roleName }));
     const policyNames = response.PolicyNames || [];
@@ -222,7 +221,7 @@ const getInlineRolePolicies = async (roleName) => {
   }
 };
 
-const getRoleTags = async (roleName) => {
+const getRoleTags = async (iamClient, roleName) => {
   try {
     const response = await iamClient.send(new ListRoleTagsCommand({ RoleName: roleName }));
 
@@ -239,7 +238,7 @@ const getRoleTags = async (roleName) => {
 // before this is ever called (see isCustomerManagedPolicyArn) since their
 // content is vetted by AWS itself and not worth a 2-call round trip per
 // policy.
-const getPolicyDocument = async (policyArn) => {
+const getPolicyDocument = async (iamClient, policyArn) => {
   try {
     const policyResponse = await iamClient.send(new GetPolicyCommand({ PolicyArn: policyArn }));
     const versionId = policyResponse.Policy?.DefaultVersionId;
@@ -261,13 +260,13 @@ const getPolicyDocument = async (policyArn) => {
 // customer-managed ones, in the same { policyName, document } shape as
 // getInlineUserPolicies/getInlineRolePolicies so the analyzer can inspect
 // both sets identically.
-const getCustomerManagedPolicyDocuments = async (attachedPolicies = []) => {
+const getCustomerManagedPolicyDocuments = async (iamClient, attachedPolicies = []) => {
   const customerManaged = attachedPolicies.filter((policy) => isCustomerManagedPolicyArn(policy.policyArn));
 
   return await Promise.all(
     customerManaged.map(async (policy) => ({
       policyName: policy.policyName,
-      document: await getPolicyDocument(policy.policyArn),
+      document: await getPolicyDocument(iamClient, policy.policyArn),
     }))
   );
 };

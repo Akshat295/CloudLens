@@ -5,10 +5,9 @@ const {
   DescribeAddressesCommand,
 } = require("@aws-sdk/client-ec2");
 
-const { ec2Client } = require("../../config/aws");
-
 const { mapEC2Instances } = require("../../mappers/ec2.mapper");
-const getEC2Instances = async () => {
+
+const getEC2Instances = async (ec2Client) => {
   const command = new DescribeInstancesCommand({});
 
   const response = await ec2Client.send(command);
@@ -16,7 +15,7 @@ const getEC2Instances = async () => {
   return mapEC2Instances(response);
 };
 
-const stopEC2Instance = async (instanceId) => {
+const stopEC2Instance = async (ec2Client, instanceId) => {
   const command = new StopInstancesCommand({
     InstanceIds: [instanceId],
   });
@@ -27,7 +26,7 @@ const stopEC2Instance = async (instanceId) => {
 // Fetched once per scan (not per instance) and grouped client-side in
 // ec2.scanner.js — cheaper than one DescribeVolumes/DescribeAddresses call
 // per instance and keeps this service's shape consistent with getEC2Instances.
-const getEBSVolumes = async () => {
+const getEBSVolumes = async (ec2Client) => {
   const command = new DescribeVolumesCommand({});
 
   const response = await ec2Client.send(command);
@@ -35,7 +34,7 @@ const getEBSVolumes = async () => {
   return response.Volumes || [];
 };
 
-const getElasticIPAddresses = async () => {
+const getElasticIPAddresses = async (ec2Client) => {
   const command = new DescribeAddressesCommand({});
 
   const response = await ec2Client.send(command);

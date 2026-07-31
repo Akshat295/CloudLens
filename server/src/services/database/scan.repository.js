@@ -1,7 +1,8 @@
 const Scan = require("../../models/Scan");
 
-const createScan = async () => {
+const createScan = async (userId) => {
   const scan = await Scan.create({
+    userId,
     status: "RUNNING",
   });
 
@@ -29,12 +30,12 @@ const completeScan = async (
   return scan;
 };
 
-const getAllScans = async () => {
-  return await Scan.find().sort({ createdAt: -1 });
+const getAllScans = async (userId) => {
+  return await Scan.find({ userId }).sort({ createdAt: -1 });
 };
 
-const getScanById = async (id) => {
-  return await Scan.findById(id);
+const getScanById = async (id, userId) => {
+  return await Scan.findOne({ _id: id, userId });
 };
 
 module.exports = {

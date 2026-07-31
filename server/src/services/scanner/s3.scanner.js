@@ -83,10 +83,10 @@ const logBucketScanResult = (
 // throttling, etc.) — calculateS3MonthlyCost already falls back to a
 // standard S3 rate whenever pricePerGB is 0, so on failure we just log and
 // let that fallback take over instead of failing the whole bucket/scan.
-const getS3PricePerGB = async (region) => {
+const getS3PricePerGB = async (pricingClient, region) => {
   try {
     const pricingFilters = buildS3PricingFilters(region);
-    const pricingResponse = await getS3Pricing(pricingFilters);
+    const pricingResponse = await getS3Pricing(pricingClient, pricingFilters);
 
     return extractStoragePricePerGB(pricingResponse);
   } catch (error) {
@@ -101,7 +101,9 @@ const getS3PricePerGB = async (region) => {
 // mergeS3Recommendations for why this is a single save rather than
 // several), and returns the Resource record (metadata) to be persisted for
 // it, along with the savings it contributes.
-const processBucket = async (scanId, bucket) => {
+const processBucket = async (scanId, userId, clients, bucket) => {
+  const { s3Client, cloudWatchClient, pricingClient } = clients;
+
   const [
     region,
     isPublic,
@@ -112,14 +114,14 @@ const processBucket = async (scanId, bucket) => {
     storage,
     policy,
   ] = await Promise.all([
-    getBucketRegion(bucket.bucketName),
-    isBucketPublic(bucket.bucketName),
-    isVersioningEnabled(bucket.bucketName),
-    getLifecycleRules(bucket.bucketName),
-    getBucketEncryption(bucket.bucketName),
-    hasReplicationConfigured(bucket.bucketName),
-    getS3StorageMetrics(bucket.bucketName),
-    getBucketPolicy(bucket.bucketName),
+    getBucketRegion(s3Client, bucket.bucketName),
+    isBucketPublic(s3Client, bucket.bucketName),
+    isVersioningEnabled(s3Client, bucket.bucketName),
+    getLifecycleRules(s3Client, bucket.bucketName),
+    getBucketEncryption(s3Client, bucket.bucketName),
+    hasReplicationConfigured(s3Client, bucket.bucketName),
+    getS3StorageMetrics(cloudWatchClient, bucket.bucketName),
+    getBucketPolicy(s3Client, bucket.bucketName),
   ]);
 
   const { encryptionEnabled, encryptionType } = encryption;
@@ -137,7 +139,7 @@ const processBucket = async (scanId, bucket) => {
 
   const distribution = analyzeStorageClassDistribution(storageClassBytes);
 
-  const pricePerGB = await getS3PricePerGB(region);
+  const pricePerGB = await getS3PricePerGB(pricingClient, region);
   const monthlyCost = calculateS3MonthlyCost(bucketSizeGB, pricePerGB);
 
   const analysis = analyzeBucketConfiguration({
@@ -189,6 +191,7 @@ const processBucket = async (scanId, bucket) => {
 
   await saveRecommendation({
     scanId,
+    userId,
     resourceId: bucket.bucketName,
     severity: mergedRecommendation.severity,
     action: mergedRecommendation.action,
@@ -273,28 +276,30 @@ const processBucket = async (scanId, bucket) => {
   };
 };
 
-const scanS3 = async (scanId) => {
-  const buckets = await getBuckets();
+const scanS3 = async (scanId, userId, clients) => {
+  const { s3Client } = clients;
+
+  const buckets = await getBuckets(s3Client);
 
   const bucketResources = [];
   const insightInputs = [];
   let totalSavings = 0;
 
   for (const bucket of buckets) {
-    const { resource, estimatedSavings, insightInput } = await processBucket(scanId, bucket);
+    const { resource, estimatedSavings, insightInput } = await processBucket(scanId, userId, clients, bucket);
 
     bucketResources.push(resource);
     insightInputs.push(insightInput);
     totalSavings += estimatedSavings;
   }
 
-  await saveResources(scanId, "S3", bucketResources);
+  await saveResources(scanId, "S3", bucketResources, userId);
 
   // Fleet-wide, rule-based (no LLM) insights computed once all buckets are
   // in, then persisted so the dashboard can read them back without
   // recomputing anything.
   const insights = generateS3Insights(insightInputs);
-  await saveInsights(scanId, insights);
+  await saveInsights(scanId, insights, userId);
 
   return {
     totalResources: buckets.length,

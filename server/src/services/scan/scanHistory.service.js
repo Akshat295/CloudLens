@@ -7,20 +7,20 @@ const {
   getRecommendationsByScanId,
 } = require("../database/recommendation.repository");
 
-const fetchAllScans = async () => {
-  return await getAllScans();
+const fetchAllScans = async (userId) => {
+  return await getAllScans(userId);
 };
 
-const fetchScanDetails = async (id) => {
-  const scan = await getScanById(id);
+const fetchScanDetails = async (id, userId) => {
+  const scan = await getScanById(id, userId);
 
   if (!scan) {
     return null;
   }
 
   const [resources, recommendations] = await Promise.all([
-    getResourcesByScanId(id),
-    getRecommendationsByScanId(id),
+    getResourcesByScanId(id, userId),
+    getRecommendationsByScanId(id, userId),
   ]);
 
   return {

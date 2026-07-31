@@ -2,8 +2,6 @@ const {
   GetMetricDataCommand,
 } = require("@aws-sdk/client-cloudwatch");
 
-const { cloudWatchClient } = require("../../config/aws");
-
 // Shared 7-day lookback window, extracted so every EC2/S3 metric query
 // (CPU, network, disk, storage) samples the exact same period.
 const getSevenDayWindow = () => {
@@ -15,7 +13,7 @@ const getSevenDayWindow = () => {
   return { startTime, endTime };
 };
 
-const getCPUUtilization = async (instanceId) => {
+const getCPUUtilization = async (cloudWatchClient, instanceId) => {
   const { startTime, endTime } = getSevenDayWindow();
 
   const command = new GetMetricDataCommand({
@@ -109,7 +107,7 @@ const buildBucketSizeQuery = (bucketName, queryId, storageType) => ({
   ReturnData: true,
 });
 
-const getS3StorageMetrics = async (bucketName) => {
+const getS3StorageMetrics = async (cloudWatchClient, bucketName) => {
   const { startTime, endTime } = getSevenDayWindow();
 
   const command = new GetMetricDataCommand({
@@ -186,7 +184,7 @@ const EMPTY_NETWORK_AND_DISK_VALUES = NETWORK_AND_DISK_METRICS.reduce(
   {}
 );
 
-const getNetworkAndDiskMetrics = async (instanceId) => {
+const getNetworkAndDiskMetrics = async (cloudWatchClient, instanceId) => {
   const { startTime, endTime } = getSevenDayWindow();
 
   const command = new GetMetricDataCommand({
@@ -230,7 +228,7 @@ const getNetworkAndDiskMetrics = async (instanceId) => {
   }
 };
 
-const getRDSCPUUtilization = async (dbInstanceIdentifier) => {
+const getRDSCPUUtilization = async (cloudWatchClient, dbInstanceIdentifier) => {
   const { startTime, endTime } = getSevenDayWindow();
 
   const command = new GetMetricDataCommand({

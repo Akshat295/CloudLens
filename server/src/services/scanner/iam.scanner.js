@@ -64,18 +64,20 @@ const logRoleScanResult = (role, { analysis, mergedRecommendation }) => {
 // access keys, tags), persists ONE merged recommendation for it (mirroring
 // the established one-resource-one-recommendation shape from EC2/S3/RDS),
 // and returns the Resource record to be persisted for it.
-const processUser = async (scanId, user) => {
+const processUser = async (scanId, userId, clients, user) => {
+  const { iamClient } = clients;
+
   const [mfaEnabled, consoleAccess, attachedPolicies, inlinePolicies, groups, accessKeys, tags] = await Promise.all([
-    hasUserMFA(user.userName),
-    hasConsoleAccess(user.userName),
-    getAttachedUserPolicies(user.userName),
-    getInlineUserPolicies(user.userName),
-    getUserGroups(user.userName),
-    getUserAccessKeys(user.userName),
-    getUserTags(user.userName),
+    hasUserMFA(iamClient, user.userName),
+    hasConsoleAccess(iamClient, user.userName),
+    getAttachedUserPolicies(iamClient, user.userName),
+    getInlineUserPolicies(iamClient, user.userName),
+    getUserGroups(iamClient, user.userName),
+    getUserAccessKeys(iamClient, user.userName),
+    getUserTags(iamClient, user.userName),
   ]);
 
-  const customerManagedPolicies = await getCustomerManagedPolicyDocuments(attachedPolicies);
+  const customerManagedPolicies = await getCustomerManagedPolicyDocuments(iamClient, attachedPolicies);
 
   const analysis = analyzeUserSecurity({
     hasConsoleAccess: consoleAccess,
@@ -112,6 +114,7 @@ const processUser = async (scanId, user) => {
 
   await saveRecommendation({
     scanId,
+    userId,
     resourceId: user.userName,
     category: IAM_CATEGORY,
     severity: mergedRecommendation.severity,
@@ -162,14 +165,16 @@ const processUser = async (scanId, user) => {
 // inline policies, usage, tags), persists ONE merged recommendation for
 // it, and returns the Resource record to be persisted for it. AWS-managed
 // service-linked roles never reach this function — see scanIAM's filter.
-const processRole = async (scanId, role) => {
+const processRole = async (scanId, userId, clients, role) => {
+  const { iamClient } = clients;
+
   const [attachedPolicies, inlinePolicies, tags] = await Promise.all([
-    getAttachedRolePolicies(role.roleName),
-    getInlineRolePolicies(role.roleName),
-    getRoleTags(role.roleName),
+    getAttachedRolePolicies(iamClient, role.roleName),
+    getInlineRolePolicies(iamClient, role.roleName),
+    getRoleTags(iamClient, role.roleName),
   ]);
 
-  const customerManagedPolicies = await getCustomerManagedPolicyDocuments(attachedPolicies);
+  const customerManagedPolicies = await getCustomerManagedPolicyDocuments(iamClient, attachedPolicies);
 
   const analysis = analyzeRoleSecurity({
     attachedPolicies,
@@ -202,6 +207,7 @@ const processRole = async (scanId, role) => {
 
   await saveRecommendation({
     scanId,
+    userId,
     resourceId: role.roleName,
     category: IAM_CATEGORY,
     severity: mergedRecommendation.severity,
@@ -239,8 +245,10 @@ const processRole = async (scanId, role) => {
   };
 };
 
-const processRootAccount = async (scanId) => {
-  const { mfaEnabled, hasAccessKeys } = await getRootAccountSecuritySummary();
+const processRootAccount = async (scanId, userId, clients) => {
+  const { iamClient } = clients;
+
+  const { mfaEnabled, hasAccessKeys } = await getRootAccountSecuritySummary(iamClient);
 
   const mfaRecommendation = getRootAccountMFARecommendation(mfaEnabled);
   const accessKeysRecommendation = getRootAccessKeysRecommendation(hasAccessKeys);
@@ -248,6 +256,7 @@ const processRootAccount = async (scanId) => {
 
   await saveRecommendation({
     scanId,
+    userId,
     resourceId: ROOT_ACCOUNT_RESOURCE_ID,
     category: IAM_CATEGORY,
     severity: mergedRecommendation.severity,
@@ -272,8 +281,10 @@ const processRootAccount = async (scanId) => {
   };
 };
 
-const scanIAM = async (scanId) => {
-  const [users, roles] = await Promise.all([getUsers(), getRoles()]);
+const scanIAM = async (scanId, userId, clients) => {
+  const { iamClient } = clients;
+
+  const [users, roles] = await Promise.all([getUsers(iamClient), getRoles(iamClient)]);
 
   // AWS-managed service-linked roles (AWSServiceRoleForTrustedAdvisor,
   // AWSServiceRoleForSupport, etc.) are created and fully managed by AWS —
@@ -281,23 +292,23 @@ const scanIAM = async (scanId) => {
   // Resources, so they never appear in the dashboard.
   const customerRoles = roles.filter((role) => !isServiceLinkedRole(role));
 
-  const rootAccountResult = await processRootAccount(scanId);
+  const rootAccountResult = await processRootAccount(scanId, userId, clients);
 
   const userResources = [];
   for (const user of users) {
-    const { resource } = await processUser(scanId, user);
+    const { resource } = await processUser(scanId, userId, clients, user);
     userResources.push(resource);
   }
 
   const roleResources = [];
   for (const role of customerRoles) {
-    const { resource } = await processRole(scanId, role);
+    const { resource } = await processRole(scanId, userId, clients, role);
     roleResources.push(resource);
   }
 
-  if (userResources.length) await saveResources(scanId, "IAM_USER", userResources);
-  if (roleResources.length) await saveResources(scanId, "IAM_ROLE", roleResources);
-  await saveResources(scanId, "IAM_ROOT_ACCOUNT", [rootAccountResult.resource]);
+  if (userResources.length) await saveResources(scanId, "IAM_USER", userResources, userId);
+  if (roleResources.length) await saveResources(scanId, "IAM_ROLE", roleResources, userId);
+  await saveResources(scanId, "IAM_ROOT_ACCOUNT", [rootAccountResult.resource], userId);
 
   return {
     totalResources: userResources.length + roleResources.length + 1,
